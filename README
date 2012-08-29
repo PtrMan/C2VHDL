@@ -1,0 +1,27 @@
+What it does
+============
+
+ - if, while, for, break, continue, return
+ - functions
+ - single dimension arrays
+ - c++ style comments
+ - contstant folding
+ - dead code removal
+ - instruction level concurrency
+
+What it doesn't
+===============
+
+ - no stdlib
+ - signed integer based types only
+ - no recursion
+ - no block comments
+ - no pointers
+ - no case
+
+Extensions
+==========
+
+ - report statement
+ - assert statement
+ - synthesisable wait_clocks statement

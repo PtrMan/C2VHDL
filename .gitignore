@@ -1,0 +1,11 @@
+.coverage
+a.out
+divide
+*.o
+work*
+*,cover
+test.c
+*.vhd
+test
+stitcher
+myname
