@@ -684,7 +684,16 @@ int main(){
 }
 
 """)
+test("comment 1",
+"""
+int main(){
+  /*assert(0);
+  assert(0);
+  assert(0);*/
+  return 0;
+}
 
+""")
 test("array 0",
 """
 int main(){
@@ -816,6 +825,18 @@ int main(){
 
 """)
 
+test("input output 2",
+"""
+int arbiter(){
+  while(1){
+    if(ready_a()) output_z(input_a());
+    if(ready_b()) output_z(input_b());
+  }
+  return 0;
+}
+
+""")
+
 test("main not main",
 """
 int main(){
@@ -829,6 +850,7 @@ int real_main(){
 }
 """)
 
-os.system("python-coverage run -p cc.py")
+os.system("python-coverage run -p c2vhdl.py")
 os.system("python-coverage combine")
 os.system("python-coverage report")
+os.system("python-coverage annotate c2vhdl.py")

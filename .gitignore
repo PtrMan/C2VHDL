@@ -8,4 +8,5 @@ test.c
 *.vhd
 test
 stitcher
+stitcher.py
 myname

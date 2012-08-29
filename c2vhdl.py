@@ -67,23 +67,33 @@ class Tokens:
       for char in line:
         if not token:
           token = char
+        #c style comment
+	elif (token + char).startswith("/*"):
+	  if (token + char).endswith("*/"):
+	    token = ""
+	  else:
+	    token += char
+        #c++ style comment
         elif token.startswith("//"):
           if newline:
             token = char
           else:
             token += char
+        #identifier
         elif token[0].isalpha():
           if char.isalnum() or char== "_":
             token += char
           else:
             tokens.append((lineno, token.lower()))
             token = char
+        #number
         elif token[0].isdigit():
-          if char.isdigit() or char.upper() in "XABCDEF":
+          if char.isdigit() or char.upper() in ".XABCDEF":
             token += char
           else:
             tokens.append((lineno, token))
             token = char
+        #operator
         elif token in operators:
           if token + char in operators:
             token += char
@@ -507,6 +517,12 @@ class Parser:
     self.tokens.expect(")")
     return Input(input_name)
 
+  def parse_ready(self, name):
+    input_name = name.replace("ready_", "")
+    self.tokens.expect("(")
+    self.tokens.expect(")")
+    return Ready(input_name)
+
   def parse_output(self, name):
     output_name = name.replace("output_", "")
     self.tokens.expect("(")
@@ -517,6 +533,8 @@ class Parser:
   def parse_function_call(self, name):
     if name.startswith("input_"):
       return self.parse_input(name)
+    if name.startswith("ready_"):
+      return self.parse_ready(name)
     if name.startswith("output_"):
       return self.parse_output(name)
     function_call = FunctionCall()
@@ -829,6 +847,13 @@ class Input:
   def generate(self, result):
       return [{"op"   :"read", "dest" :result, "input":self.name}]
 
+class Ready:
+  def __init__(self, name):
+    self.name = name
+
+  def generate(self, result):
+      return [{"op"   :"ready", "dest" :result, "input":self.name}]
+
 class Variable:
   def generate(self, result):
     if hasattr(self, "index_expression"):
@@ -962,7 +987,7 @@ def parallelise(instructions):
 
     """Return True if an instruction cannot be executed in parallel with other instructions"""
 
-    return instruction["op"] in ["read", "write", "label"]
+    return instruction["op"] in ["read", "write", "ready", "label"]
 
   def is_jump(instruction):
 
@@ -1243,6 +1268,10 @@ def generate_VHDL(name, frames, output_file, registers, arrays):
         output_file.write("          S_INPUT_%s_ACK <= '0';\n"%instruction["input"])
         output_file.write("          PROGRAM_COUNTER <= %s;\n"%(location+1))
         output_file.write("        end if;\n")
+
+      elif instruction["op"] == "ready":
+        output_file.write("        REGISTER_%s <= (0 => INPUT_%s_STB, others => '0');\n"%(
+          instruction["dest"], instruction["input"]))
 
       elif instruction["op"] == "write":
         output_file.write("        OUTPUT_%s <= std_logic_vector(REGISTER_%s);\n"%(
