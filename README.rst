@@ -39,7 +39,7 @@ Download
 
 Python script: `c2vhdl.py`_.
 
-.. _`c2vhdl` : https://github.com/downloads/dawsonjon/C2VHDL/c2vhdl.py
+.. _`c2vhdl.py` : https://github.com/downloads/dawsonjon/C2VHDL/c2vhdl.py
 
 Installation
 =============
@@ -104,10 +104,15 @@ Command Line Usage
 c2vhdl.py [options] <input_file>
 
 compile options:
+
   no_reuse      : prevent register resuse
+
   no_concurrent : prevent concurrency
 
 tool options:
+
   ghdl          : compiles using the ghdl compiler
+
   modelsim      : compiles using the modelsim compiler
+
   run           : runs compiled code, used with ghdl or modelsimoptions
