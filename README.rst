@@ -38,6 +38,8 @@ I just haven't been implemented yet:
  - no pointers
  - no goto statement
  - no forward declarations
+ - no struct
+ - no union
 
 Download
 ========
@@ -67,7 +69,7 @@ When a design is reset, execution starts with the last function defined in
 the C file. This need not be called *main*. The name of the last function
 will be used as the name for the generated VHDL component. The C program will
 appear to execute in sequence, although the compiler will execute instructions
-concurrently if it does not effect the outcome of the program. This will allow
+concurrently if it does not affect the outcome of the program. This will allow
 your program to take advantage of the inherent parallelism present in a hardware
 design.
 
