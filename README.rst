@@ -15,7 +15,7 @@ Running existing C programs in FPGAs is not a primary objective.
 What it Does
 ============
 
- - most statements: if, while, for, break, continue, return
+ - most statements: if, while, for, break, continue, return, switch, case, default
  - functions
  - single dimension arrays
  - c style comments
@@ -31,7 +31,7 @@ What it Doesn't
  - no float or double
  - no recursion
  - no pointers
- - no case statement
+ - no goto statement
  - no forward declarations
 
 Download
@@ -97,6 +97,18 @@ execution, you can check if data is ready::
 There is no equivilent function to check if an output is ready to recieve data,
 this could cause deadlocks if both the sending and receiving end were waiting
 for one another.
+
+Debugging
+---------
+
+Since the language is a subset of C, you can use the usual C based tools for
+debugging.  If you want to know what is going on in a VHDL simulation, you can
+use these builtin debug functions::
+
+  assert(0); //This will fail
+  assert(a == 12); //This will fail if a is not 12
+  report(1); //This will cause the simulator to print 1
+  report(temp); //This will cause the simulator to print the value of temp
 
 Command Line Usage
 ------------------

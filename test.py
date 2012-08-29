@@ -27,6 +27,118 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("switch 1",
+     """int main(){
+        switch(0){
+            case 0: return 3;
+            case 1: return 2;
+            case 2: return 1;
+            default: return 0;
+        }
+     }
+     """
+)
+test("switch 2",
+     """int main(){
+        switch(2){
+            case 0: return 3;
+            case 1: return 2;
+            case 2: return 1;
+            default: return 0;
+        }
+     }
+     """
+)
+test("switch 3",
+     """int main(){
+        switch(5){
+            case 0: return 3;
+            case 1: return 2;
+            case 2: return 1;
+            default: return 0;
+        }
+     }
+     """
+)
+test("switch 4",
+     """int main(){
+        int a = 0;
+        switch(0){
+            case 0: a = 1;
+            case 1: a = 2;
+            case 2: a = 3;
+            default: a = 4;
+        }
+        return a;
+     }
+     """
+)
+test("switch 5",
+     """int main(){
+        int a = 0;
+        switch(1){
+            case 0: a = 1;
+            case 1: a = 2;
+            case 2: a = 3;
+            default: a = 4;
+        }
+        return a;
+     }
+     """
+)
+test("switch 6",
+     """int main(){
+        int a = 1;
+        switch(10){
+            case 0: a = 1;
+            case 1: a = 2;
+            case 2: a = 3;
+            default: a = 4;
+        }
+        return a;
+     }
+     """
+)
+test("switch 7",
+     """int main(){
+        int a = 1;
+        switch(0){
+            case 0: a = 1; break;
+            case 1: a = 2; break;
+            case 2: a = 3; break;
+            default: a = 4; break;
+        }
+        return a;
+     }
+     """
+)
+test("switch 8",
+     """int main(){
+        int a = 1;
+        switch(2){
+            case 0: a = 1; break;
+            case 1: a = 2; break;
+            case 2: a = 3; break;
+            default: a = 4; break;
+        }
+        return a;
+     }
+     """
+)
+test("switch 9",
+"""int main(){
+int a = 1;
+switch(9){
+    case 0: a = 1; break;
+    case 1: a = 2; break;
+    case 2: a = 3; break;
+    default: a = 4; break;
+}
+return a;
+}
+"""
+)
+
 test("break 0",
 """
 int main(){
@@ -792,7 +904,53 @@ int main(){
 }
 
 """)
-
+test_fails("error 7",
+"""
+int main(){
+  switch(1){
+    case 0:
+    default:
+    default:
+  }
+  return 0;
+}
+""")
+test_fails("error 8",
+"""
+int main(){
+  default:
+  return 0;
+}
+""")
+test_fails("error 9",
+"""
+int main(){
+  case 1:
+  return 0;
+}
+""")
+test_fails("error 10",
+"""
+int main(){
+  int a = 12;
+  switch(a){
+    case a + 1:
+    a++;
+  }
+  return 0;
+}
+""")
+test_fails("error 11",
+"""
+int myfunction(){
+  return 0;
+}
+int main(){
+  int a = 12;
+  myfunction()=10;
+  return 0;
+}
+""")
 test("input 1",
 """
 int main(){

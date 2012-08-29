@@ -304,6 +304,12 @@ class Parser:
       return self.parse_assert()
     elif self.tokens.peek() == "report":
       return self.parse_report()
+    elif self.tokens.peek() == "switch":
+      return self.parse_switch()
+    elif self.tokens.peek() == "case":
+      return self.parse_case()
+    elif self.tokens.peek() == "default":
+      return self.parse_default()
     elif self.tokens.peek() == "wait_clocks":
       return self.parse_wait_clocks()
     else:
@@ -342,6 +348,47 @@ class Parser:
     else:
       if_.false_statement = None
     return if_
+
+  def parse_switch(self):
+    switch = Switch()
+    switch.cases = {}
+    self.tokens.expect("switch")
+    self.tokens.expect("(")
+    expression = self.parse_expression()
+    self.tokens.expect(")")
+    stored_loop = self.loop
+    self.loop = switch
+    statement = self.parse_statement()
+    self.loop = stored_loop
+    switch.expression = expression
+    switch.allocator = self.allocator
+    switch.statement = statement
+    return switch
+
+  def parse_case(self):
+    self.tokens.expect("case")
+    expression = self.parse_expression()
+    self.tokens.expect(":")
+    try:
+      expression = value(expression)
+      case = Case()
+      self.loop.cases[expression] =  case
+    except NotConstant:
+      self.tokens.error("case expression must be constant")
+    except AttributeError:
+      self.tokens.error("case statements may only be use inside a switch statment")
+    return case
+
+  def parse_default(self):
+    self.tokens.expect("default")
+    self.tokens.expect(":")
+    default = Default()
+    if not hasattr(self.loop, "cases"):
+      self.tokens.error("default statements may only be use inside a switch statment")
+    if hasattr(self.loop, "default"):
+      self.tokens.error("A switch statement may only have one default statement")
+    self.loop.default=default
+    return default
 
   def parse_while(self):
     loop = Loop()
@@ -667,6 +714,30 @@ class If:
         instructions.extend(self.false_statement.generate())
       instructions.append({"op":"label", "label":"end_%s"%id(self)})
       return instructions
+
+class Switch:
+  def generate(self):
+    result = self.allocator.new()
+    test = self.allocator.new()
+    instructions = self.expression.generate(result)
+    for value, case in self.cases.iteritems():
+      instructions.append({"op":"==", "dest":test, "src":result, "right":value})
+      instructions.append({"op":"jmp_if_true", "src":test, "label":"case_%s"%id(case)})
+    if hasattr(self, "default"):
+      instructions.append({"op":"goto", "label":"case_%s"%id(self.default)})
+    self.allocator.free(result)
+    self.allocator.free(test)
+    instructions.extend(self.statement.generate())
+    instructions.append({"op":"label", "label":"break_%s"%id(self)})
+    return instructions
+
+class Case:
+  def generate(self):
+    return [{"op":"label", "label":"case_%s"%id(self)}]
+
+class Default:
+  def generate(self):
+    return [{"op":"label", "label":"case_%s"%id(self)}]
 
 class Loop:
   def generate(self):
@@ -1365,13 +1436,13 @@ if __name__ == "__main__":
 
   #parse command line
   input_file = sys.argv[-1]
-  name = input_file.split(".")[0]
   reuse = "no_reuse" not in sys.argv
 
   #compile into VHDL
   input_file = open(input_file)
   parser = Parser(input_file, reuse)
   process = parser.parse_process()
+  name = process.main.name
   instructions = process.generate()
   if "no_concurent" in sys.argv:
     frames = [[i] for i in instructions]
