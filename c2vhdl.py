@@ -52,7 +52,18 @@ class Tokens:
 
   """Break the input file into a stream of tokens, provide functions to traverse the stream."""
 
-  def __init__(self, buffer):
+  def __init__(self, filename):
+    self.tokens = []
+    self.filename = None
+    self.lineno = None
+    self.scan(filename)
+
+  def scan(self, filename):
+    try:
+      input_file = open(filename)    
+    except IOError:
+      print "Cannot open file:", filename
+      sys.exit(0)
 
     operators = ["!", "~", "+", "-", "*", "/", "//", "%", "=", "==", "<", ">", "<=", ">=", "!=",
     "|", "&", "^", "||", "&&", "(", ")", "{", "}", "[", "]", ";", "<<", ">>", ",", "+=", "-=",
@@ -61,8 +72,12 @@ class Tokens:
     token = []
     tokens = []
     lineno = 1
-    for line in buffer.splitlines():
+    for line in input_file:
       line = line+" "
+      if line.strip().startswith("#include"):
+        filename = line.strip().replace("#include", "").strip(' ><"')
+        self.scan(filename)
+        continue 
       newline = True
       for char in line:
         if not token:
@@ -84,55 +99,54 @@ class Tokens:
           if char.isalnum() or char== "_":
             token += char
           else:
-            tokens.append((lineno, token.lower()))
+            tokens.append((filename, lineno, token.lower()))
             token = char
         #number
         elif token[0].isdigit():
           if char.isdigit() or char.upper() in ".XABCDEF":
             token += char
           else:
-            tokens.append((lineno, token))
+            tokens.append((filename, lineno, token))
             token = char
         #operator
         elif token in operators:
           if token + char in operators:
             token += char
           else:
-            tokens.append((lineno, token))
+            tokens.append((filename, lineno, token))
             token = char
         else:
           token = char
         newline = False
       lineno += 1
-    self.tokens = tokens
+    self.tokens.extend(tokens)
 
   def error(self, string):
     print string
-    print "at line:", self.lineno
+    print "at line:", self.lineno, "in file:", self.filename
     sys.exit(-1)
-
-  def line(self):
-    return self.lineno
 
   def peek(self):
     if self.tokens:
-      return self.tokens[0][1]
+      return self.tokens[0][2]
     else:
       return ""
 
   def get(self):
     if self.tokens:
-      self.lineno = self.tokens[0][0]
-    lineno, token = self.tokens.pop(0)
+      self.lineno = self.tokens[0][1]
+      self.filename = self.tokens[0][0]
+    filename, lineno, token = self.tokens.pop(0)
     return token
 
   def end(self):
     return not self.tokens
 
   def expect(self, expected):
-    lineno, actual = self.tokens.pop(0)
+    filename, lineno, actual = self.tokens.pop(0)
     if self.tokens:
-      self.lineno = self.tokens[0][0]
+      self.lineno = self.tokens[0][1]
+      self.filename = self.tokens[0][0]
     if actual == expected:
       return
     else:
@@ -181,7 +195,7 @@ class Parser:
     self.scope = {}
     self.function = None
     self.loop = None
-    self.tokens = Tokens(input_file.read())
+    self.tokens = Tokens(input_file)
     self.allocator = Allocator(reuse)
 
   def parse_process(self):
@@ -258,7 +272,8 @@ class Parser:
     assert_.expression = self.parse_expression()
     self.tokens.expect(")")
     self.tokens.expect(";")
-    assert_.line = self.tokens.line()
+    assert_.line = self.tokens.lineno
+    assert_.filename = self.tokens.filename
     return assert_
 
   def parse_report(self):
@@ -269,7 +284,8 @@ class Parser:
     report_.expression = self.parse_expression()
     self.tokens.expect(")")
     self.tokens.expect(";")
-    report_.line = self.tokens.line()
+    report_.line = self.tokens.lineno
+    report_.filename = self.tokens.filename
     return report_
 
   def parse_wait_clocks(self):
@@ -280,7 +296,7 @@ class Parser:
     wait_clocks.expression = self.parse_expression()
     self.tokens.expect(")")
     self.tokens.expect(";")
-    wait_clocks.line = self.tokens.line()
+    wait_clocks.line = self.tokens.lineno
     return wait_clocks
 
   def parse_statement(self):
@@ -664,7 +680,7 @@ class Assert:
     result = self.allocator.new()
     instructions = self.expression.generate(result)
     self.allocator.free(result)
-    instructions.append({"op":"assert", "src":result, "line":self.line})
+    instructions.append({"op":"assert", "src":result, "line":self.line, "file":self.filename})
     return instructions
 
 class Return:
@@ -678,7 +694,7 @@ class Report:
     result = self.allocator.new()
     instructions = self.expression.generate(result)
     self.allocator.free(result)
-    instructions.append({"op":"report", "src":result, "line":self.line})
+    instructions.append({"op":"report", "src":result, "line":self.line, "file":self.filename})
     return instructions
 
 class WaitClocks:
@@ -686,7 +702,7 @@ class WaitClocks:
     result = self.allocator.new()
     instructions = self.expression.generate(result)
     self.allocator.free(result)
-    instructions.append({"op":"wait_clocks", "src":result, "line":self.line})
+    instructions.append({"op":"wait_clocks", "src":result})
     return instructions
 
 class If:
@@ -1375,9 +1391,10 @@ def generate_VHDL(name, frames, output_file, registers, arrays):
 
       elif instruction["op"] == "assert":
         output_file.write(
-          '        assert REGISTER_%s /= X"0000" report "Assertion failed at line: %s" severity failure;\n'%(
+          '        assert REGISTER_%s /= X"0000" report "Assertion failed at line: %s in file: %s" severity failure;\n'%(
           instruction["src"],
-          instruction["line"]))
+          instruction["line"],
+          instruction["file"]))
 
       elif instruction["op"] == "wait_clocks":
         output_file.write("        if TIMER < REGISTER_%s then\n"%instruction["src"])
@@ -1387,9 +1404,10 @@ def generate_VHDL(name, frames, output_file, registers, arrays):
 
       elif instruction["op"] == "report":
         output_file.write(
-          '        report integer\'image(to_integer(REGISTER_%s)) & " (report at line: %s)";\n'%(
+          '        report integer\'image(to_integer(REGISTER_%s)) & " (report at line: %s in file: %s)";\n'%(
           instruction["src"],
-          instruction["line"]))
+          instruction["line"],
+          instruction["file"]))
 
       elif instruction["op"] == "stop":
         output_file.write('        STOP <= True;\n')
@@ -1439,7 +1457,6 @@ if __name__ == "__main__":
   reuse = "no_reuse" not in sys.argv
 
   #compile into VHDL
-  input_file = open(input_file)
   parser = Parser(input_file, reuse)
   process = parser.parse_process()
   name = process.main.name

@@ -15,6 +15,8 @@ Running existing C programs in FPGAs is not a primary objective.
 What it Does
 ============
 
+C2VHDL implements a decent subset of C, enough to do useful things in an FPGA:
+
  - most statements: if, while, for, break, continue, return, switch, case, default
  - functions
  - single dimension arrays
@@ -26,6 +28,9 @@ What it Does
 
 What it Doesn't
 ===============
+
+C2VHDL doesn't implement these thing that either don't work well in FPGAs, or that
+I just haven't been implemented yet:
 
  - no libc
  - no float or double

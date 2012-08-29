@@ -27,6 +27,14 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("include 1",
+"""#include "test_include.c"
+int main(){
+  assert(include_function()==12);
+  return 0;
+}
+"""
+)
 test("switch 1",
      """int main(){
         switch(0){
