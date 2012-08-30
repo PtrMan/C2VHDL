@@ -343,10 +343,13 @@ class Parser:
       if not hasattr(lvalue, "declaration"):
         self.tokens.error("left hand operand of assignment is not modifiable")
       operator = self.tokens.get()
-      if operator in ["++", "--"]:
-        return Assignment(lvalue, Constant(1), operator[:-1], self.allocator)
+      if operator == "=":
+        expression = self.parse_ternary_expression()
+      elif operator in ["++", "--"]:
+        expression = Binary(operator[:-1], lvalue, Constant(1), self.allocator)
       else:
-        return Assignment(lvalue, self.parse_ternary_expression(), operator[:-1], self.allocator)
+        expression = Binary(operator[:-1], lvalue, self.parse_ternary_expression(), self.allocator)
+      return Assignment(lvalue, expression, self.allocator)
     else:
       return lvalue
 
@@ -963,48 +966,24 @@ class Variable:
       return instructions
 
 class Assignment:
-  def __init__(self, lvalue, expression, operator, allocator):
+  def __init__(self, lvalue, expression, allocator):
     self.lvalue = lvalue
     self.expression = expression
     self.allocator = allocator
-    self.operator = operator
 
   def generate(self, result):
     instructions = self.expression.generate(result)
     if hasattr(self.lvalue, "index_expression"):
       index = self.allocator.new()
       instructions.extend(self.lvalue.index_expression.generate(index))
-      if self.operator:
-        temp = self.allocator.new()
-        instructions.append({"op"    :"array_read",
-                             "array" :self.lvalue.declaration.register,
-                             "dest"  :temp,
-                             "index" :index,
-                             "size"  :self.lvalue.declaration.size})
-        instructions.append({"op"  : self.operator,
-                             "dest": temp,
-                             "src" : temp,
-                             "srcb": result})
-        instructions.append({"op"    :"array_write",
-                             "array" :self.lvalue.declaration.register,
-                             "src"   :temp,
-                             "index" :index,
-                             "size"  :self.lvalue.declaration.size})
-        self.allocator.free(temp)
-      else:
-        instructions.append({"op"    :"array_write",
-                             "array" :self.lvalue.declaration.register,
-                             "src"   :result,
-                             "index" :index,
-                             "size"  :self.lvalue.declaration.size})
+      instructions.append({"op"    :"array_write",
+                           "array" :self.lvalue.declaration.register,
+                           "src"   :result,
+                           "index" :index,
+                           "size"  :self.lvalue.declaration.size})
       self.allocator.free(index)
     else:
-      if self.operator:
-        instructions.append({"op"  : self.operator,
-                             "dest": self.lvalue.declaration.register,
-                             "src" : self.lvalue.declaration.register,
-                             "srcb":result})
-      else:
+      if result != self.lvalue.declaration.register:
         instructions.append({"op"   : "move",
                              "dest" : self.lvalue.declaration.register,
                              "src"  : result})
