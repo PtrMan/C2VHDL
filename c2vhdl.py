@@ -173,7 +173,7 @@ class Allocator:
     self.all_arrays.append((reg, size))
     return reg
 
-  def new(self, name="temperary_register"):
+  def new(self, name="temporary_register"):
     reg = 0
     while reg in self.registers:
       reg += 1
@@ -197,6 +197,7 @@ class Parser:
     self.loop = None
     self.tokens = Tokens(input_file)
     self.allocator = Allocator(reuse)
+    self.structs = []
 
   def parse_process(self):
     process = Process()
@@ -207,6 +208,8 @@ class Parser:
     while not self.tokens.end():
       if self.tokens.peek() == "struct":
         self.parse_define_struct()
+      elif self.tokens.peek() == "typedef":
+        self.parse_typedef_struct()
       else:
         process.functions.append(self.parse_function())
     process.main = self.main
@@ -305,6 +308,8 @@ class Parser:
   def parse_statement(self):
     if self.tokens.peek() in ["int", "short", "long", "char"]:
       return self.parse_declaration()
+    elif self.tokens.peek() in self.structs:
+      return self.parse_struct_declaration()
     elif self.tokens.peek() == "struct":
       return self.parse_struct_declaration()
     elif self.tokens.peek() == "if":
@@ -467,6 +472,25 @@ class Parser:
     self.scope = stored_scope
     return block
 
+  def parse_typedef_struct(self):
+    self.tokens.expect("typedef")
+    self.tokens.expect("struct")
+    self.tokens.expect("{")
+    members = []
+    while self.tokens.peek() != "}":
+      if self.tokens.get() not in ["int", "short", "long", "char"]:
+        self.tokens.error("unknown type")
+      members.append(self.tokens.get())
+      if self.tokens.peek() == ";":
+        self.tokens.expect(";")
+      else:
+        break; 
+    self.tokens.expect("}")
+    name = self.tokens.get()
+    self.tokens.expect(";")
+    self.scope[name] = members
+    self.structs.append(name)
+
   def parse_define_struct(self):
     self.tokens.expect("struct")
     name = self.tokens.get()
@@ -485,7 +509,8 @@ class Parser:
     self.scope[name] = members
 
   def parse_struct_declaration(self):
-    self.tokens.expect("struct")
+    if self.tokens.peek() == "struct":
+      self.tokens.expect("struct")
     struct_name = self.tokens.get()
     name = self.tokens.get()
     self.tokens.expect(";")

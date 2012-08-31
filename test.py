@@ -64,6 +64,21 @@ int main(){
 }
 """
 )
+test("struct 3",
+"""
+typedef struct{int a; int b; int c;} blah;
+int main(){
+  blah myblah;
+  myblah.a = 1;
+  myblah.b = 2;
+  myblah.c = 3;
+  assert(myblah.a == 1);
+  assert(myblah.b == 2);
+  assert(myblah.c == 3);
+  return 0;
+}
+"""
+)
 test("include 1",
 """#include "test_include.c"
 int main(){
