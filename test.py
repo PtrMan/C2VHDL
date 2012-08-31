@@ -27,6 +27,43 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("struct 1",
+"""
+struct blah {int a; int b; int c;};
+int main(){
+  struct blah myblah;
+  myblah.a = 1;
+  myblah.b = 2;
+  myblah.c = 3;
+  assert(myblah.a == 1);
+  assert(myblah.b == 2);
+  assert(myblah.c == 3);
+  return 0;
+}
+"""
+)
+test("struct 2",
+"""
+struct as {int a; int b; int c;};
+int main(){
+  struct as asa;
+  struct as asb;
+  asa.a = 1;
+  asb.a = 3;
+  asa.b = 2;
+  asb.b = 2;
+  asa.c = 3;
+  asb.c = 1;
+  assert(asa.a == 1);
+  assert(asb.a == 3);
+  assert(asa.b == 2);
+  assert(asb.b == 2);
+  assert(asa.c == 3);
+  assert(asb.c == 1);
+  return 0;
+}
+"""
+)
 test("include 1",
 """#include "test_include.c"
 int main(){

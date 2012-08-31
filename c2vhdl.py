@@ -67,7 +67,7 @@ class Tokens:
 
     operators = ["!", "~", "+", "-", "*", "/", "//", "%", "=", "==", "<", ">", "<=", ">=", "!=",
     "|", "&", "^", "||", "&&", "(", ")", "{", "}", "[", "]", ";", "<<", ">>", ",", "+=", "-=",
-    "*=", "/=", "%=", "&=", "|=", "<<=", ">>=", "++", "--", "?", ":"]
+    "*=", "/=", "%=", "&=", "|=", "<<=", ">>=", "++", "--", "?", ":", "."]
 
     token = []
     tokens = []
@@ -205,7 +205,10 @@ class Parser:
     process.outputs = []
     process.functions = []
     while not self.tokens.end():
-      process.functions.append(self.parse_function())
+      if self.tokens.peek() == "struct":
+        self.parse_define_struct()
+      else:
+        process.functions.append(self.parse_function())
     process.main = self.main
     return process
 
@@ -301,7 +304,9 @@ class Parser:
 
   def parse_statement(self):
     if self.tokens.peek() in ["int", "short", "long", "char"]:
-      return self.parse_declare()
+      return self.parse_declaration()
+    elif self.tokens.peek() == "struct":
+      return self.parse_struct_declaration()
     elif self.tokens.peek() == "if":
       return self.parse_if()
     elif self.tokens.peek() == "while":
@@ -462,35 +467,64 @@ class Parser:
     self.scope = stored_scope
     return block
 
-  def parse_declare(self):
+  def parse_define_struct(self):
+    self.tokens.expect("struct")
+    name = self.tokens.get()
+    self.tokens.expect("{")
+    members = []
+    while self.tokens.peek() != "}":
+      if self.tokens.get() not in ["int", "short", "long", "char"]:
+        self.tokens.error("unknown type")
+      members.append(self.tokens.get())
+      if self.tokens.peek() == ";":
+        self.tokens.expect(";")
+      else:
+        break; 
+    self.tokens.expect("}")
+    self.tokens.expect(";")
+    self.scope[name] = members
+
+  def parse_struct_declaration(self):
+    self.tokens.expect("struct")
+    struct_name = self.tokens.get()
+    name = self.tokens.get()
+    self.tokens.expect(";")
+    if struct_name not in self.scope:
+      self.tokens.error("unknown struct: %s"%struct_name)
+    members = self.scope[struct_name]
+    registers = [(i, self.allocator.new("struct %s.%s"%(struct_name, i))) for i in members]
+    declaration = StructDeclaration(dict(registers))
+    self.scope[name] = declaration
+    return declaration
+
+  def parse_declaration(self):
     if self.tokens.get() not in ["int", "short", "long", "char"]:
       self.tokens.error("unknown type")
     declarations = []
     while True:
-      declare = Declare()
       name = self.tokens.get()
-      declare.size = 1
       if self.tokens.peek() == "[":
         self.tokens.expect("[")
-        declare.size = self.tokens.get()
+        size = self.tokens.get()
         self.tokens.expect("]")
-        self.scope[name] = declare
-        declare.register = self.allocator.new_array(declare.size)
+        register = self.allocator.new_array(size)
+        declaration = ArrayDeclaration(register, size)
       else:
-        self.scope[name] = declare
-        declare.register = self.allocator.new("variable "+name)
         if self.tokens.peek() == "=":
           self.tokens.expect("=")
-          declare.initiator = self.parse_ternary_expression()
+          initializer = self.parse_ternary_expression()
         else:
-          declare.initiator = Constant(0)
-      declarations.append(declare)
+          initializer = Constant(0)
+        register = self.allocator.new("variable "+name)
+        declaration = VariableDeclaration(register, initializer)
+      self.scope[name] = declaration
+      declarations.append(declaration)
       if self.tokens.peek() != ",":
         break
       else:
         self.tokens.expect(",")
     self.tokens.expect(";")
-    return CompoundDeclare(declarations)
+    return CompoundDeclaration(declarations)
 
   def parse_expression(self):
     expression = self.parse_assignment()
@@ -634,16 +668,22 @@ class Parser:
       self.tokens.error("%s is not a number"%token)
 
   def parse_variable(self, name):
-    variable = Variable()
-    variable.allocator = self.allocator
     if name not in self.scope:
       self.tokens.error("Unknown variable: %s"%name)
-    variable.declaration = self.scope[name]
-    if variable.declaration.size != 1:
+    declaration = self.scope[name]
+    if declaration.type_ == "variable":
+      return Variable(declaration, self.allocator)
+    elif declaration.type_ == "array":
       self.tokens.expect("[")
-      variable.index_expression = self.parse_expression()
+      index_expression = self.parse_expression()
       self.tokens.expect("]")
-    return variable
+      return Array(declaration, index_expression, self.allocator)
+    elif declaration.type_ == "struct":
+      self.tokens.expect(".")
+      member = self.tokens.get()
+      return  Struct(declaration, member, self.allocator)
+    else:
+      self.tokens.error("Object: %s is not an expression"%name)
 
 #Parse tree/Machine instruction generator
 ####################################################################################################
@@ -794,7 +834,7 @@ class Block:
       instructions.extend(statement.generate())
     return instructions
 
-class CompoundDeclare:
+class CompoundDeclaration:
   def __init__(self, declarations):
     self.declarations = declarations
 
@@ -804,18 +844,34 @@ class CompoundDeclare:
       instructions.extend(declaration.generate());
     return instructions
 
-class Declare:
+class VariableDeclaration:
+  def __init__(self, register, initializer):
+    self.register = register
+    self.type_ = "variable"
+    self.initializer = initializer
   def generate(self):
-    if hasattr(self, "initiator"):
-      return self.initiator.generate(self.register)
-    else:
-      return []
+    return self.initializer.generate(self.register)
+
+class ArrayDeclaration:
+  def __init__(self, register, size):
+    self.register = register
+    self.size = size
+    self.type_ = "array"
+  def generate(self):
+    return []
+
+class StructDeclaration:
+  def __init__(self, registers):
+    self.registers = registers
+    self.type_ = "struct"
+  def generate(self):
+    return []
 
 class Argument:
   def __init__(self, name, parser):
+    self.type_="variable"
     parser.scope[name] = self
     self.register = parser.allocator.new("function argument "+name)
-    self.size = 1
   def generate(self): return []
 
 class DiscardExpression:
@@ -944,26 +1000,50 @@ class Ready:
   def generate(self, result):
       return [{"op"   :"ready", "dest" :result, "input":self.name}]
 
-class Variable:
+class Array:
+  def __init__(self, declaration, index_expression, allocator):
+    self.declaration = declaration
+    self.allocator = allocator
+    self.index_expression = index_expression
+
   def generate(self, result):
-    if hasattr(self, "index_expression"):
-      instructions = []
-      index = self.allocator.new()
-      instructions.extend(self.index_expression.generate(index))
-      instructions.append({"op"   :"array_read",
-                           "array":self.declaration.register,
-                           "index":index,
-                           "dest" :result,
-                           "size" :self.declaration.size})
-      self.allocator.free(index)
-      return instructions
-    else:
-      instructions = []
-      if result != self.declaration.register:
-        instructions.append({"op"  :"move",
-                             "dest":result,
-                             "src" :self.declaration.register})
-      return instructions
+    instructions = []
+    index = self.allocator.new()
+    instructions.extend(self.index_expression.generate(index))
+    instructions.append({"op"   :"array_read",
+                         "array":self.declaration.register,
+                         "index":index,
+                         "dest" :result,
+                         "size" :self.declaration.size})
+    self.allocator.free(index)
+    return instructions
+
+class Variable:
+  def __init__(self, declaration, allocator):
+    self.declaration = declaration
+    self.allocator = allocator
+
+  def generate(self, result):
+    instructions = []
+    if result != self.declaration.register:
+      instructions.append({"op"  :"move",
+                           "dest":result,
+                           "src" :self.declaration.register})
+    return instructions
+
+class Struct:
+  def __init__(self, declaration, member, allocator):
+    self.declaration = declaration
+    self.allocator = allocator
+    self.member = member
+
+  def generate(self, result):
+    instructions = []
+    if result != self.declaration.registers:
+      instructions.append({"op"  :"move",
+                           "dest":result,
+                           "src" :self.declaration.registers[self.member]})
+    return instructions
 
 class Assignment:
   def __init__(self, lvalue, expression, allocator):
@@ -973,7 +1053,16 @@ class Assignment:
 
   def generate(self, result):
     instructions = self.expression.generate(result)
-    if hasattr(self.lvalue, "index_expression"):
+
+    if self.lvalue.declaration.type_ == "variable":
+
+      if result != self.lvalue.declaration.register:
+        instructions.append({"op"   : "move",
+                             "dest" : self.lvalue.declaration.register,
+                             "src"  : result})
+
+    elif self.lvalue.declaration.type_ == "array":
+
       index = self.allocator.new()
       instructions.extend(self.lvalue.index_expression.generate(index))
       instructions.append({"op"    :"array_write",
@@ -982,11 +1071,15 @@ class Assignment:
                            "index" :index,
                            "size"  :self.lvalue.declaration.size})
       self.allocator.free(index)
-    else:
-      if result != self.lvalue.declaration.register:
+
+    elif self.lvalue.declaration.type_ == "struct":
+
+      register = self.lvalue.declaration.registers[self.lvalue.member]
+      if result != register:
         instructions.append({"op"   : "move",
-                             "dest" : self.lvalue.declaration.register,
+                             "dest" : register,
                              "src"  : result})
+
     return instructions
 
 class Constant:
