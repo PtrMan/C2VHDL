@@ -66,7 +66,7 @@ int main(){
 )
 test("struct 3",
 """
-typedef struct{int a; int b; int c;} blah;
+typedef struct {int a; int b; int c;} blah;
 int main(){
   blah myblah;
   myblah.a = 1;
@@ -75,6 +75,29 @@ int main(){
   assert(myblah.a == 1);
   assert(myblah.b == 2);
   assert(myblah.c == 3);
+  return 0;
+}
+"""
+)
+test("struct 4",
+"""
+typedef struct{int a; int b; int c;} mytype;
+typedef struct{mytype a;} othertype;
+int main(){
+  othertype a;
+  othertype b;
+  a.a.a = 1;
+  b.a.a = 2;
+  a.a.b = 3;
+  b.a.b = 4;
+  a.a.c = 5;
+  b.a.c = 6;
+  assert(a.a.a == 1);
+  assert(b.a.a == 2);
+  assert(a.a.b == 3);
+  assert(b.a.b == 4);
+  assert(a.a.c == 5);
+  assert(b.a.c == 6);
   return 0;
 }
 """
