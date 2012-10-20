@@ -1245,7 +1245,7 @@ def parallelise(instructions):
 #VHDL Code Generator
 ####################################################################################################
 
-def generate_VHDL(name, frames, output_file, registers, arrays):
+def generate_VHDL(input_file, name, frames, output_file, registers, arrays):
 
   """A big ugly function to crunch through all the instructions and generate the VHDL equivilent"""
 
@@ -1299,6 +1299,17 @@ def generate_VHDL(name, frames, output_file, registers, arrays):
                "  signal TIMER : signed(15 downto 0);\n"]
 
   #output the code in VHDL
+  output_file.write("--name : %s;\n"%name)
+  for i in inputs:
+      output_file.write("--input : %s\n"%i)
+  for i in outputs:
+      output_file.write("--output : %s\n"%i)
+  output_file.write("--source_file : %s\n"%input_file)
+  output_file.write("---%s\n"%name.title())
+  output_file.write("---%s\n"%"".join(["=" for i in name]))
+  output_file.write("---\n")
+  output_file.write("---*Created by C2VHDL*\n\n")
+
   output_file.write("library ieee;\n")
   output_file.write("use ieee.std_logic_1164.all;\n")
   output_file.write("use ieee.numeric_std.all;\n\n")
@@ -1569,7 +1580,7 @@ if __name__ == "__main__":
     frames = parallelise(instructions)
   output_file = name + ".vhd"
   output_file = open(output_file, "w")
-  generate_VHDL(name, frames, output_file, parser.allocator.all_registers,
+  generate_VHDL(input_file, name, frames, output_file, parser.allocator.all_registers,
     parser.allocator.all_arrays)
   output_file.close()
 
