@@ -6,13 +6,14 @@ __copyright__ = "Copyright (C) 2012, Jonathan P Dawson"
 __version__ = "0.1"
 
 import sys
+import os
 
 #Helper functions
 ####################################################################################################
 class C2VHDLError(Exception):
     def __init__(self, message, filename=None, lineno=None):
         self.message = message
-        self.filename = filename
+        self.filename = os.path.abspath(filename)
         self.lineno = lineno
         
 
@@ -1590,7 +1591,7 @@ if __name__ == "__main__":
         parser.allocator.all_arrays)
       output_file.close()
   except C2VHDLError as err:
-      print "Error"
+      print "Error in file:", err.filename, "at line:", err.lineno
       print err.message
       sys.exit(-1)
 
