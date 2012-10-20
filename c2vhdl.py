@@ -10,8 +10,11 @@ import sys
 #Helper functions
 ####################################################################################################
 class C2VHDLError(Exception):
-    def __init__(self, message):
+    def __init__(self, message, filename=None, lineno=None):
         self.message = message
+        self.filename = filename
+        self.lineno = lineno
+        
 
 def unique(l):
 
@@ -125,7 +128,7 @@ class Tokens:
     self.tokens.extend(tokens)
 
   def error(self, string):
-      raise C2VHDLError(string + "\n" + "at line: %s in file: %s"%(self.lineno, self.filename))
+      raise C2VHDLError(string + "\n", self.filename, self.lineno)
 
   def peek(self):
     if self.tokens:
