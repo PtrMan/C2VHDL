@@ -9,6 +9,10 @@ import sys
 
 #Helper functions
 ####################################################################################################
+class C2VHDLError(Exception):
+    def __init__(self, message):
+        self.message = message
+
 def unique(l):
 
   """In the absence of set in older python implementations, make list values unique"""
@@ -62,8 +66,7 @@ class Tokens:
     try:
       input_file = open(filename)    
     except IOError:
-      print "Cannot open file:", filename
-      sys.exit(0)
+      raise C2VHDLError("Cannot open file: "+filename)
 
     operators = ["!", "~", "+", "-", "*", "/", "//", "%", "=", "==", "<", ">", "<=", ">=", "!=",
     "|", "&", "^", "||", "&&", "(", ")", "{", "}", "[", "]", ";", "<<", ">>", ",", "+=", "-=",
@@ -122,9 +125,7 @@ class Tokens:
     self.tokens.extend(tokens)
 
   def error(self, string):
-    print string
-    print "at line:", self.lineno, "in file:", self.filename
-    sys.exit(-1)
+      raise C2VHDLError(string + "\n" + "at line: %s in file: %s"%(self.lineno, self.filename))
 
   def peek(self):
     if self.tokens:
@@ -1570,20 +1571,25 @@ if __name__ == "__main__":
   input_file = sys.argv[-1]
   reuse = "no_reuse" not in sys.argv
 
-  #compile into VHDL
-  parser = Parser(input_file, reuse)
-  process = parser.parse_process()
-  name = process.main.name
-  instructions = process.generate()
-  if "no_concurent" in sys.argv:
-    frames = [[i] for i in instructions]
-  else:
-    frames = parallelise(instructions)
-  output_file = name + ".vhd"
-  output_file = open(output_file, "w")
-  generate_VHDL(input_file, name, frames, output_file, parser.allocator.all_registers,
-    parser.allocator.all_arrays)
-  output_file.close()
+  try:
+      #compile into VHDL
+      parser = Parser(input_file, reuse)
+      process = parser.parse_process()
+      name = process.main.name
+      instructions = process.generate()
+      if "no_concurent" in sys.argv:
+        frames = [[i] for i in instructions]
+      else:
+        frames = parallelise(instructions)
+      output_file = name + ".vhd"
+      output_file = open(output_file, "w")
+      generate_VHDL(input_file, name, frames, output_file, parser.allocator.all_registers,
+        parser.allocator.all_arrays)
+      output_file.close()
+  except C2VHDLError as err:
+      print "Error"
+      print err.message
+      sys.exit(-1)
 
   #run the compiled design using the simulator of your choice.
   if "ghdl" in sys.argv:
