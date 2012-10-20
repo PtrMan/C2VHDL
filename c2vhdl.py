@@ -1300,7 +1300,7 @@ def generate_VHDL(input_file, name, frames, output_file, registers, arrays):
 
   #output the code in VHDL
   output_file.write("--name : %s\n"%name)
-  output_file.write("--tag : c components\n"%input_file)
+  output_file.write("--tag : c components\n")
   for i in inputs:
       output_file.write("--input : %s\n"%i)
   for i in outputs:
