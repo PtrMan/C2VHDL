@@ -5,7 +5,7 @@ divide
 work*
 *,cover
 test.c
-*.vhd
+*.v
 test
 stitcher
 stitcher.py
