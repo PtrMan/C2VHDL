@@ -1,7 +1,7 @@
 C2VHDL
 ======
 
-C2VHDL converts a subset of the C language into VHDL.
+C2VHDL converts a subset of the C language into Verilog.
 
 The project aims to provide:
 
@@ -11,6 +11,10 @@ The project aims to provide:
  - A fast and flexible verification environment using C.
 
 Running existing C programs in FPGAs is not a primary objective.
+
+Note:
+
+C2VHDL was designed to target the VHDL language, but this branch outputs code to verilog.
 
 What it Does
 ============
@@ -60,14 +64,14 @@ Installation
 How to use it
 =============
 
-Each C file is implemented as a VHDL component that can be used in a design.
+Each C file is implemented as a Verilog component that can be used in a design.
 
 Execution Model
 ---------------
 
 When a design is reset, execution starts with the last function defined in
 the C file. This need not be called *main*. The name of the last function
-will be used as the name for the generated VHDL component. The C program will
+will be used as the name for the generated Verilog component. The C program will
 appear to execute in sequence, although the compiler will execute instructions
 concurrently if it does not affect the outcome of the program. This will allow
 your program to take advantage of the inherent parallelism present in a hardware
@@ -79,7 +83,7 @@ components in your device at the same time.
 Adding Inputs and Outputs
 -------------------------
 
-If you want to add an input or an output to your VHDL component, you can achieve
+If you want to add an input or an output to your Verilog component, you can achieve
 this by calling functions with *special* names::
 
   int temp;
@@ -109,7 +113,7 @@ Debugging
 ---------
 
 Since the language is a subset of C, you can use the usual C based tools for
-debugging.  If you want to know what is going on in a VHDL simulation, you can
+debugging.  If you want to know what is going on in a Verilog simulation, you can
 use these builtin debug functions::
 
   assert(0); //This will fail
@@ -130,8 +134,6 @@ compile options:
 
 tool options:
 
-  ghdl          : compiles using the ghdl compiler
+  iverilog      : compiles using the iverilog compiler
 
-  modelsim      : compiles using the modelsim compiler
-
-  run           : runs compiled code, used with ghdl or modelsimoptions
+  run           : runs compiled code, used with iverilog option
