@@ -1254,20 +1254,6 @@ def generate_VHDL(input_file, name, frames, output_file, registers, arrays):
 
   """A big ugly function to crunch through all the instructions and generate the VHDL equivilent"""
 
-  #trandslate C operators to VHDL functions
-  operator_functions = {"+" :"ADD", "-" :"SUB", "*" :"MUL", "&" :"BAND", "|" :"BOR", "^":"BXOR",
-    "/" :"DIV", "%" :"MODULO", "<<":"LSHIFT", ">>":"RSHIFT", "<" :"LT", ">":"GT", "<=":"LE",
-    ">=":"GE", "==":"EQ", "!=":"NE"}
-
-  #translate VHDL functions to VHDL operators
-  function_operators = {"ADD":"+", "SUB":"-", "MUL":"*", "BAND":"and", "BOR":"or", "BXOR":"xor",
-    "DIV":"/", "MODULO":"mod", "LSHIFT":"SHIFT_LEFT", "RSHIFT":"SHIFT_RIGHT", "LT":"<", "GT":">",
-    "LE":"<=", "GE":">=", "EQ":"=", "NE":"/="}
-
-  #work out which operators are needed
-  operators = [i["op"] for frame in frames for i in frame]
-  functions = unique([operator_functions[i] for i in operators if i in operator_functions])
-
   #calculate the values of jump locations
   location = 0
   labels = {}
@@ -1291,119 +1277,126 @@ def generate_VHDL(input_file, name, frames, output_file, registers, arrays):
   outputs = unique([i["output"] for frame in frames for i in frame if "output" in i])
   testbench = not inputs and not outputs
 
-  #in testbench mode, generate clk and reset internaly
-  if testbench:
-    input_ports = []
-    signals = ["  signal CLK : std_logic;\n",
-               "  signal RST : std_logic;\n",
-               "  signal STOP : boolean := False;\n",
-               "  signal TIMER : signed(15 downto 0);\n"]
-  else:
-    input_ports = ["    CLK : in std_logic", "    RST : in std_logic"]
-    signals = ["  signal STOP : boolean := False;\n",
-               "  signal TIMER : signed(15 downto 0);\n"]
-
-  #output the code in VHDL
-  output_file.write("--name : %s\n"%name)
-  output_file.write("--tag : c components\n")
-  for i in inputs:
-      output_file.write("--input : INPUT_%s:16\n"%i)
-  for i in outputs:
-      output_file.write("--output : OUTPUT_%s:16\n"%i)
-  output_file.write("--source_file : %s\n"%input_file)
-  output_file.write("---%s\n"%name.title())
-  output_file.write("---%s\n"%"".join(["=" for i in name]))
-  output_file.write("---\n")
-  output_file.write("---*Created by C2VHDL*\n\n")
-
-  output_file.write("library ieee;\n")
-  output_file.write("use ieee.std_logic_1164.all;\n")
-  output_file.write("use ieee.numeric_std.all;\n\n")
-  output_file.write("entity %s is\n"%name)
-
   #Do not generate a port in testbench mode
-  if not testbench:
-    output_file.write("  port(\n")
-    input_ports.extend(["    INPUT_%s : in std_logic_vector(15 downto 0)"%i.upper() for i in inputs])
-    input_ports.extend(["    INPUT_%s_STB : in std_logic"%i.upper() for i in inputs])
-    input_ports.extend(["    OUTPUT_%s_ACK : in std_logic"%i.upper() for i in outputs])
-    output_ports = []
-    output_ports.extend(["    OUTPUT_%s : out std_logic_vector(15 downto 0)"%i.upper() for i in outputs])
-    output_ports.extend(["    OUTPUT_%s_STB : out std_logic"%i.upper() for i in outputs])
-    output_ports.extend(["    INPUT_%s_ACK : out std_logic"%i.upper() for i in inputs])
-    output_file.write(";\n".join(input_ports+output_ports))
-    output_file.write(");\n")
+  inports = [
+    (name, 16) for i in inputs
+  ] + [
+    (name + "_stb", 16) for i in inputs
+  ] + [
+    (name + "_ack", 16) for i in outputs
+  ]
 
-  output_file.write("end entity %s;\n\n"%name)
-  output_file.write("architecture RTL of %s is\n\n"%name)
+  outports = [
+    (name, 16) for i in outputs
+  ] + [
+    (name + "_stb", 16) for i in outputs
+  ] + [
+    (name + "_ack", 16) for i in inputs
+  ]
 
-  #Generate arithmetic functions used by instructions
-  for function in functions:
-    output_file.write("  function %s(A:signed; B:signed) return signed is\n"%function)
-    output_file.write("  begin\n")
-    if function in ["ADD", "SUB", "MUL", "BOR", "BAND", "BXOR", "DIV", "MODULO"]:
-      output_file.write("    return resize(A %s B, 16);\n"%function_operators[function])
-    elif function in ["EQ","NE","LT","GT","LE","GE"]:
-      output_file.write("    if A %s B then\n"%function_operators[function])
-      output_file.write('      return X"0001";\n')
-      output_file.write("    else\n")
-      output_file.write('      return X"0000";\n')
-      output_file.write("    end if;\n")
-    elif function in ["LSHIFT", "RSHIFT"]:
-      output_file.write('      return %s(A, to_integer(B));\n'%function_operators[function])
-    output_file.write("  end function;\n\n")
+  signals = [
+    ("STOP", 1),
+    ("TIMER", 16),
+    ("PROGRAM_COUNTER", len(frames))
+  ] + [
+    ("REGISTER_%s"%(register), 16) for register in registers
+  ] + [
+    ("OUTPUT_%s_stb"%(register), 16) for i in outputs
+  ] + [
+    ("INPUT_%s_ack"%(register), 16) for i in inputs
+  ]
 
-  #Generate internal signals
-  output_file.write("  signal PROGRAM_COUNTER : integer range 0 to %s;\n"%len(frames))
-  for register, use in registers.iteritems():
-    output_file.write("  signal REGISTER_%s: signed(15 downto 0);--%s\n"%(register, use))
-  signals.extend(["  signal S_OUTPUT_%s_STB : std_logic;\n"%i.upper() for i in outputs])
-  signals.extend(["  signal S_INPUT_%s_ACK : std_logic;\n"%i.upper() for i in inputs])
-  for signal in signals:
-    output_file.write(signal)
+  if testbench:
+    signals.append(("CLK", 1))
+    signals.append(("RST", 1))
+  else:
+    inports.append(("CLK", 1))
+    inports.append(("RST", 1))
+
+  #output the code in verilog
+  output_file.write("//name : %s\n"%name)
+  output_file.write("//tag : c components\n")
+  for i in inputs:
+      output_file.write("//input : INPUT_%s:16\n"%i)
+  for i in outputs:
+      output_file.write("//output : OUTPUT_%s:16\n"%i)
+  output_file.write("//source_file : %s\n"%input_file)
+  output_file.write("///%s\n"%name.title())
+  output_file.write("///%s\n"%"".join(["=" for i in name]))
+  output_file.write("///\n")
+  output_file.write("///*Created by C2VHDL*\n\n")
+  output_file.write("module %s"%name)
+
+  all_ports = [name for name, size in inports + outports]
+  if all_ports:
+      output_file.write("(")
+      output_file.write(",".join(all_ports))
+      output_file.write(");\n")
+  else:
+      output_file.write(";\n")
+
+
+  def write_declaration(object_type, name, size):
+      if size == 1:
+          output_file.write(object_type)
+          output_file.write(name)
+          output_file.write(";\n")
+      else:
+          output_file.write(object_type)
+          output_file.write("[%i:0]"%(size-1))
+          output_file.write(" ")
+          output_file.write(name)
+          output_file.write(";\n")
+
+  for name, size in inports:
+      write_declaration("  input ", name, size)
+
+  for name, size in outports:
+      write_declaration("  output ", name, size)
+
+  for name, size in signals:
+      write_declaration("  reg ", name, size)
 
   #Generate arrays
   for array, size in arrays:
     size = int(size)
-    output_file.write("  type ARRAY_%s_TYPE is array (0 to %s) of signed(15 downto 0);\n"%(
-    array, (size-1)))
-    output_file.write("  signal ARRAY_%s : ARRAY_%s_TYPE;\n"%(array, array))
-  output_file.write("\nbegin\n\n")
+    output_file.write("  reg [15:0] ARRAY_%s [%i:0];\n"%(array, size-1))
 
-  #In testbench mode, generate a clock internaly
+  #generate clock and reset in testbench mode
   if testbench:
-    output_file.write("  GENERATE_CLK : process\n")
-    output_file.write("  begin\n")
-    output_file.write("    while not STOP loop\n")
-    output_file.write("      CLK <= '0';\n")
-    output_file.write("      wait for 5 ns;\n")
-    output_file.write("      CLK <= '1';\n")
-    output_file.write("      wait for 5 ns;\n")
-    output_file.write("    end loop;\n")
-    output_file.write("    wait;\n")
-    output_file.write("  end process GENERATE_CLK;\n\n")
-    output_file.write("  RST <= '1', '0' after 50 ns;\n\n")
+      output_file.write("  initial\n")
+      output_file.write("  begin\n")
+      output_file.write("    RST <= 1'b1;\n")
+      output_file.write("    CLK <= 1'b0;\n")
+      output_file.write("    #50 RST <= 1'b0;\n")
+      output_file.write("  end\n")
+
+      output_file.write("  always\n")
+      output_file.write("  begin\n")
+      output_file.write("    #5 CLK <= ~CLK;\n")
+      output_file.write("  end\n")
 
   #Generate a state machine to execute the instructions
   binary_operators = ["+", "-", "*", "/", "|", "&", "^", "<<", ">>", "<",">", ">=",
     "<=", "==", "!="]
-  output_file.write("  EXECUTE : process\n")
+
+  output_file.write("  \n  always @(posedge CLK)\n")
   output_file.write("  begin\n")
-  output_file.write("    wait until rising_edge(CLK);\n")
   output_file.write("    PROGRAM_COUNTER <= PROGRAM_COUNTER + 1;\n")
-  output_file.write('    TIMER <= X"0000";\n')
-  output_file.write("    case PROGRAM_COUNTER is\n")
+  output_file.write("    TIMER <= 16'h0000;\n")
+  output_file.write("    case(PROGRAM_COUNTER)\n")
 
   #A frame is executed in each state
   for location, frame in enumerate(frames):
-    output_file.write("      when %s =>\n"%location)
+    output_file.write("      16'd%s:\n"%location)
+    output_file.write("      begin\n")
     for instruction in frame:
 
       if instruction["op"] == "literal":
         output_file.write(
-          "        REGISTER_%s <= to_signed(%s, 16);\n"%(
+          "        REGISTER_%s <= 16'd%s;\n"%(
           instruction["dest"],
-          instruction["literal"]))
+          instruction["literal"]&0xffff))
 
       elif instruction["op"] == "move":
         output_file.write(
@@ -1413,70 +1406,69 @@ def generate_VHDL(input_file, name, frames, output_file, registers, arrays):
 
       elif instruction["op"] in ["~"]:
         output_file.write(
-          "        REGISTER_%s <= not REGISTER_%s;\n"%(
+          "        REGISTER_%s <= ~REGISTER_%s;\n"%(
           instruction["dest"],
           instruction["src"]))
 
       elif instruction["op"] in binary_operators and "left" in instruction:
         output_file.write(
-          "        REGISTER_%s <= %s(to_signed(%s, 16), REGISTER_%s);\n"%(
+          "        REGISTER_%s <= $signed(16'd%s) %s $signed(REGISTER_%s);\n"%(
           instruction["dest"],
-          operator_functions[instruction["op"]],
-          instruction["left"],
+          instruction["left"]&0xffff,
+          instruction["op"],
           instruction["srcb"]))
 
       elif instruction["op"] in binary_operators and "right" in instruction:
         output_file.write(
-          "        REGISTER_%s <= %s(REGISTER_%s, to_signed(%s, 16));\n"%(
+          "        REGISTER_%s <= $signed(REGISTER_%s) %s $signed(16'd%s);\n"%(
           instruction["dest"],
-          operator_functions[instruction["op"]],
           instruction["src"],
-          instruction["right"]))
+          instruction["op"],
+          instruction["right"] & 0xffff))
 
       elif instruction["op"] in binary_operators:
         output_file.write(
-          "        REGISTER_%s <= %s(REGISTER_%s, REGISTER_%s);\n"%(
+          "        REGISTER_%s <= $signed(REGISTER_%s) %s $signed(REGISTER_%s);\n"%(
           instruction["dest"],
-          operator_functions[instruction["op"]],
           instruction["src"],
+          instruction["op"],
           instruction["srcb"]))
 
       elif instruction["op"] == "jmp_if_false":
-        output_file.write('        if REGISTER_%s = X"0000" then\n'%(instruction["src"]));
-        output_file.write("          PROGRAM_COUNTER <= %s;\n"%instruction["label"])
-        output_file.write("        end if;\n")
+        output_file.write("        if (REGISTER_%s == 16'h0000)\n"%(instruction["src"]));
+        output_file.write("          PROGRAM_COUNTER <= %s;\n"%(instruction["label"]&0xffff))
 
       elif instruction["op"] == "jmp_if_true":
-        output_file.write('        if REGISTER_%s /= X"0000" then\n'%(instruction["src"]));
-        output_file.write("          PROGRAM_COUNTER <= %s;\n"%instruction["label"])
-        output_file.write("        end if;\n")
+        output_file.write("        if (REGISTER_%s != 16'h0000)\n"%(instruction["src"]));
+        output_file.write("          PROGRAM_COUNTER <= 16'd%s;\n"%(instruction["label"]&0xffff))
 
       elif instruction["op"] == "jmp_and_link":
-        output_file.write("        PROGRAM_COUNTER <= %s;\n"%instruction["label"])
-        output_file.write("        REGISTER_%s <= to_signed(%s, 16);\n"%(
-          instruction["dest"], location+1))
+        output_file.write("        PROGRAM_COUNTER <= 16'd%s;\n"%(instruction["label"]&0xffff))
+        output_file.write("        REGISTER_%s <= 16'd%s;\n"%(
+          instruction["dest"], (location+1)&0xffff))
 
       elif instruction["op"] == "jmp_to_reg":
         output_file.write(
-          "        PROGRAM_COUNTER <= to_integer(REGISTER_%s);\n"%instruction["src"])
+          "        PROGRAM_COUNTER <= REGISTER_%s;\n"%instruction["src"])
 
       elif instruction["op"] == "goto":
-        output_file.write("        PROGRAM_COUNTER <= %s;\n"%instruction["label"])
+        output_file.write("        PROGRAM_COUNTER <= 16'd%s;\n"%(instruction["label"]&0xffff))
 
       elif instruction["op"] == "read":
-        output_file.write("        REGISTER_%s <= signed(INPUT_%s);\n"%(
+        output_file.write("        REGISTER_%s <= input_%s;\n"%(
           instruction["dest"], instruction["input"]))
         output_file.write("        PROGRAM_COUNTER <= %s;\n"%location)
-        output_file.write("        S_INPUT_%s_ACK <= '1';\n"%instruction["input"])
-        output_file.write( "        if S_INPUT_%s_ACK = '1' and INPUT_%s_STB = '1' then\n"%(
+        output_file.write("        input_%s_ack <= 1'b1;\n"%instruction["input"])
+        output_file.write( "       if (input_%s_ack == 1'b1 and input_%s_stb == 1'b1) begin\n"%(
           instruction["input"],
-          instruction["input"]))
-        output_file.write("          S_INPUT_%s_ACK <= '0';\n"%instruction["input"])
-        output_file.write("          PROGRAM_COUNTER <= %s;\n"%(location+1))
-        output_file.write("        end if;\n")
+          instruction["input"]
+        ))
+        output_file.write("          input_%s_ack <= 1'b0;\n"%instruction["input"])
+        output_file.write("          PROGRAM_COUNTER <= 16'd%s;\n"%(location+1))
+        output_file.write("        end;\n")
 
       elif instruction["op"] == "ready":
-        output_file.write("        REGISTER_%s <= (0 => INPUT_%s_STB, others => '0');\n"%(
+        output_file.write("        REGISTER_%s <= (0 => input_%s_stb, others => '0');\n"%(
           instruction["dest"], instruction["input"]))
 
       elif instruction["op"] == "write":
@@ -1494,7 +1486,7 @@ def generate_VHDL(input_file, name, frames, output_file, registers, arrays):
 
       elif instruction["op"] == "array_read":
         output_file.write(
-          "        REGISTER_%s <= ARRAY_%s(to_integer(REGISTER_%s) mod %s);\n"%(
+          "        REGISTER_%s <= ARRAY_%s[REGISTER_%s %% %s];\n"%(
           instruction["dest"],
           instruction["array"],
           instruction["index"],
@@ -1502,57 +1494,48 @@ def generate_VHDL(input_file, name, frames, output_file, registers, arrays):
 
       elif instruction["op"] == "array_write":
         output_file.write(
-          "        ARRAY_%s(to_integer(REGISTER_%s) mod %s) <= REGISTER_%s;\n"%(
+          "        ARRAY_%s[REGISTER_%s %% %s] <= REGISTER_%s;\n"%(
           instruction["array"],
           instruction["index"],
           instruction["size"],
-          instruction["src"]))
+          instruction["src"]
+        ))
 
       elif instruction["op"] == "assert":
-        output_file.write(
-          '        assert REGISTER_%s /= X"0000" report "Assertion failed at line: %s in file: %s" severity failure;\n'%(
-          instruction["src"],
+        output_file.write( "        if (REGISTER_%s == 16'h0000) begin\n"%instruction["src"])
+        output_file.write( "          $display(\"Assertion failed at line: %s in file: %s\");\n"%(
           instruction["line"],
-          instruction["file"]))
+          instruction["file"]
+        ))
+        output_file.write( "          $finish_and_return(1);\n")
+        output_file.write( "        end\n")
 
       elif instruction["op"] == "wait_clocks":
-        output_file.write("        if TIMER < REGISTER_%s then\n"%instruction["src"])
+        output_file.write("        if (TIMER < REGISTER_%s) begin\n"%instruction["src"])
         output_file.write("          PROGRAM_COUNTER <= PROGRAM_COUNTER;\n")
         output_file.write("          TIMER <= TIMER+1;\n")
-        output_file.write("        end if;\n")
+        output_file.write("        end\n")
 
       elif instruction["op"] == "report":
         output_file.write(
-          '        report integer\'image(to_integer(REGISTER_%s)) & " (report at line: %s in file: %s)";\n'%(
-          instruction["src"],
+          '        $display ("%%d (report at line: %s in file: %s)", $signed(REGISTER_%s));\n'%(
           instruction["line"],
-          instruction["file"]))
+          instruction["file"],
+          instruction["src"],
+        ))
 
       elif instruction["op"] == "stop":
-        output_file.write('        STOP <= True;\n')
+        output_file.write('        $finish;\n')
         output_file.write("        PROGRAM_COUNTER <= PROGRAM_COUNTER;\n")
+    output_file.write("      end\n")
 
-  output_file.write("      when others => null;\n")
-  output_file.write("    end case;\n")
+  output_file.write("    endcase\n")
 
   #Reset program counter and control signals
-  output_file.write("    if RST = '1' then\n")
-  output_file.write("      PROGRAM_COUNTER <= 0;\n")
-  controls = (
-    ["      S_OUTPUT_%s_STB <= '0';\n"%i.upper() for i in outputs] +
-    ["      S_INPUT_%s_ACK <= '0';\n"%i.upper() for i in inputs])
-  for control in controls:
-    output_file.write(control)
-  output_file.write("    end if;\n")
-  output_file.write("  end process EXECUTE;\n")
+  output_file.write("    if (RST == 1'b1) PROGRAM_COUNTER <= 0;\n")
+  output_file.write("  end\n")
 
-  #buffer outputs that need to be read.
-  buffers = []
-  buffers.extend(["  OUTPUT_%s_STB <= S_OUTPUT_%s_STB;\n"%(i.upper(),i.upper()) for i in outputs])
-  buffers.extend(["  INPUT_%s_ACK <= S_INPUT_%s_ACK;\n"%(i.upper(),i.upper()) for i in inputs])
-  for buffer in buffers:
-    output_file.write(buffer)
-  output_file.write("\nend RTL;\n")
+  output_file.write("\nendmodule\n")
 
 #Main Compiler Application
 ####################################################################################################
@@ -1566,7 +1549,7 @@ if __name__ == "__main__":
     print "  no_concurrent : prevent concurrency"
     print
     print "tool options:"
-    print "  ghdl          : compiles using the ghdl compiler"
+    print "  iverilog      : compiles using the icarus verilog compiler"
     print "  modelsim      : compiles using the modelsim compiler"
     print "  run           : runs compiled code, used with ghdl or modelsimoptions"
     sys.exit(-1)
@@ -1585,7 +1568,7 @@ if __name__ == "__main__":
         frames = [[i] for i in instructions]
       else:
         frames = parallelise(instructions)
-      output_file = name + ".vhd"
+      output_file = name + ".v"
       output_file = open(output_file, "w")
       generate_VHDL(input_file, name, frames, output_file, parser.allocator.all_registers,
         parser.allocator.all_arrays)
@@ -1596,35 +1579,16 @@ if __name__ == "__main__":
       sys.exit(-1)
 
   #run the compiled design using the simulator of your choice.
-  if "ghdl" in sys.argv:
+  if "iverilog" in sys.argv:
     import os
     import tempfile
     import shutil
-    vhdl_file = os.path.abspath("%s.vhd"%name)
+    verilog_file = os.path.abspath("%s.v"%name)
     tempdir = tempfile.mkdtemp()
     os.chdir(tempdir)
-    os.system("ghdl -a %s"%vhdl_file)
-    os.system("ghdl -e %s"%name)
+    os.system("iverilog -o %s %s"%(name, verilog_file))
     if "run" in sys.argv:
-      result =  os.system("./%s"%name)
-      if result:
-        sys.exit(1)
-      else:
-        sys.exit(0)
-    shutil.rmtree(tempdir)
-
-  if "modelsim" in sys.argv:
-    import os
-    import tempfile
-    import shutil
-    vhdl_file = os.path.abspath("%s.vhd"%name)
-    tempdir = tempfile.mkdtemp()
-    os.chdir(tempdir)
-    os.system("vlib compiled")
-    os.system("vmap work compiled")
-    os.system("vcom %s"%vhdl_file)
-    if "run" in sys.argv:
-      result = os.system('vsim -c -do "run -all; exit;" %s'%name)
+      result = os.system("vvp %s"%name)
       if result:
         sys.exit(1)
       else:

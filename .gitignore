@@ -10,3 +10,5 @@ test
 stitcher
 stitcher.py
 myname
+main.v
+real_main.v
