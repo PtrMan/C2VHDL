@@ -6,8 +6,11 @@ work*
 *,cover
 test.c
 *.v
+*.vhd
+*.pyc
 test
 stitcher
+divider_test.c
 stitcher.py
 myname
 main.v
