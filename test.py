@@ -8,7 +8,7 @@ def test(test, code):
   f = open("test.c", 'w')
   f.write(code)
   f.close()
-  result = os.system("python-coverage run -p c2vhdl.py iverilog run test.c")
+  result = os.system("python-coverage run -p c2verilog.py iverilog run test.c")
   if result == 0:
     print test, "...pass"
   else:
@@ -20,7 +20,7 @@ def test_fails(test, code):
   f.write(code)
   f.close()
   print "One error expected ..."
-  result = os.system("python-coverage run -p c2vhdl.py iverilog run test.c")
+  result = os.system("python-coverage run -p c2verilog.py iverilog run test.c")
   if result == 0:
     print test, "...fail"
     sys.exit(0)
@@ -1091,7 +1091,7 @@ int real_main(){
 }
 """)
 
-os.system("python-coverage run -p c2vhdl.py")
+os.system("python-coverage run -p c2verilog.py")
 os.system("python-coverage combine")
 os.system("python-coverage report")
-os.system("python-coverage annotate c2vhdl.py")
+os.system("python-coverage annotate c2verilog.py")
