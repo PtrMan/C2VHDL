@@ -205,16 +205,18 @@ class ArrayDeclaration:
     self.allocator = allocator
     self.size = size
   def instance(self):
-    register = self.allocator.new_array(self.size)
-    return ArrayInstance(register, self.size)
+    location = self.allocator.new_array(self.size)
+    register = self.allocator.new("array")
+    return ArrayInstance(location, register, self.size)
 
 class ArrayInstance:
-  def __init__(self, register, size):
+  def __init__(self, location, register, size):
     self.register = register
+    self.location = location
     self.size = size
     self.type_ = "array"
   def generate(self):
-    return []
+      return [{"op":"literal", "literal":self.location, "dest":self.register}]
 
 class StructDeclaration:
   def __init__(self, members):
@@ -382,7 +384,7 @@ class Array:
     instructions.append({"op"    :"+",
                          "dest"  :result,
                          "src"   :result,
-                         "right" :self.declaration.register})
+                         "srcb"  :self.declaration.register})
     instructions.append({"op"    :"memory_read_request",
                          "src"   :result})
     instructions.append({"op"    :"memory_read",
@@ -425,7 +427,7 @@ class Assignment:
       instructions.append({"op"    :"+",
                            "dest"  :index,
                            "src"   :index,
-                           "right" :self.lvalue.declaration.register})
+                           "srcb"  :self.lvalue.declaration.register})
       instructions.append({"op"    :"memory_write",
                            "src"   :index,
                            "srcb"  :result})
