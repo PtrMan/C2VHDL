@@ -7,7 +7,11 @@ __version__ = "0.1"
 
 import sys
 import os
-from compiler import Parser, C2CHIPError, parallelise
+
+from compiler.parser import Parser
+from compiler.exceptions import C2CHIPError
+from compiler.optimizer import parallelise
+from compiler.tokens import Tokens
 
 def unique(l):
 
