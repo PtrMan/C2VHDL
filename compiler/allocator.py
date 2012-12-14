@@ -1,3 +1,7 @@
+__author__ = "Jon Dawson"
+__copyright__ = "Copyright (C) 2012, Jonathan P Dawson"
+__version__ = "0.1"
+
 class Allocator:
 
   """Maintain a pool of registers, variables and arrays. Keep track of what they are used for."""
