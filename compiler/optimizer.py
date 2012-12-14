@@ -22,21 +22,11 @@ def parallelise(instructions):
         registers.append(instruction[field])
     return registers
 
-  def modifies_array(instruction):
+  def accesses_memory(instruction):
 
     """Return the array modified by this instruction if any"""
 
-    if instruction["op"] == "array_write":
-      return instruction["array"]
-    return None
-
-  def uses_array(instruction):
-
-    """Return the array used by this instruction if any"""
-
-    if instruction["op"] == "array_read":
-      return instruction["array"]
-    return None
+    return instruction["op"] in ["memory_write", "memory_read_request", "memory_read"]
 
   def is_solitary(instruction):
 
@@ -63,10 +53,8 @@ def parallelise(instructions):
           return True
         if modifies_register(i) == modifies_register(instruction):
           return True
-      if modifies_array(i) is not None:
-        if modifies_array(i) == uses_array(instruction):
-          return True
-        if modifies_array(i) == modifies_array(instruction):
+      if accesses_memory(i):
+        if accesses_memory(instruction):
           return True
       if is_jump(i):
         return True
@@ -74,8 +62,8 @@ def parallelise(instructions):
       if modifies_register(i) is not None:
         if modifies_register(instruction) in uses_registers(i):
           return True
-      if modifies_array(i) is not None:
-        if uses_array(i) == modifies_array(instruction):
+      if accesses_memory(i):
+        if accesses_memory(instruction):
           return True
     if is_jump(instruction) and preceding:
       return True

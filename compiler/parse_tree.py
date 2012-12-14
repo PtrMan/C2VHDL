@@ -378,14 +378,15 @@ class Array:
 
   def generate(self, result):
     instructions = []
-    index = self.allocator.new()
-    instructions.extend(self.index_expression.generate(index))
-    instructions.append({"op"   :"array_read",
-                         "array":self.declaration.register,
-                         "index":index,
-                         "dest" :result,
-                         "size" :self.declaration.size})
-    self.allocator.free(index)
+    instructions.extend(self.index_expression.generate(result))
+    instructions.append({"op"    :"+",
+                         "dest"  :result,
+                         "src"   :result,
+                         "right" :self.declaration.register})
+    instructions.append({"op"    :"memory_read_request",
+                         "src"   :result})
+    instructions.append({"op"    :"memory_read",
+                         "dest"  :result})
     return instructions
 
 class Variable:
@@ -421,11 +422,13 @@ class Assignment:
 
       index = self.allocator.new()
       instructions.extend(self.lvalue.index_expression.generate(index))
-      instructions.append({"op"    :"array_write",
-                           "array" :self.lvalue.declaration.register,
-                           "src"   :result,
-                           "index" :index,
-                           "size"  :self.lvalue.declaration.size})
+      instructions.append({"op"    :"+",
+                           "dest"  :index,
+                           "src"   :index,
+                           "right" :self.lvalue.declaration.register})
+      instructions.append({"op"    :"memory_write",
+                           "src"   :index,
+                           "srcb"  :result})
       self.allocator.free(index)
 
     return instructions

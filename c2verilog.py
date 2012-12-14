@@ -19,7 +19,7 @@ def unique(l):
 
   return dict(zip(l, l)).keys()
 
-def generate_CHIP(input_file, name, frames, output_file, registers, arrays):
+def generate_CHIP(input_file, name, frames, output_file, registers, memory_size):
 
   """A big ugly function to crunch through all the instructions and generate the CHIP equivilent"""
 
@@ -65,7 +65,11 @@ def generate_CHIP(input_file, name, frames, output_file, registers, arrays):
 
   signals = [
     ("timer", 16),
-    ("program_counter", len(frames))
+    ("program_counter", len(frames)),
+    ("address", 16),
+    ("data_out", 16),
+    ("data_in", 16),
+    ("write_enable", 1),
   ] + [
     ("register_%s"%(register), 16) for register in registers
   ] + [
@@ -127,10 +131,8 @@ def generate_CHIP(input_file, name, frames, output_file, registers, arrays):
   for name, size in signals:
       write_declaration("  reg    ", name, size)
 
-  #Generate arrays
-  for array, size in arrays:
-    size = int(size)
-    output_file.write("  reg [15:0] ARRAY_%s [%i:0];\n"%(array, size-1))
+  memory_size = int(memory_size)
+  output_file.write("  reg [15:0] memory [%i:0];\n"%(size-1))
 
   #generate clock and reset in testbench mode
   if testbench:
@@ -154,6 +156,11 @@ def generate_CHIP(input_file, name, frames, output_file, registers, arrays):
 
   output_file.write("  \n  always @(posedge clk)\n")
   output_file.write("  begin\n")
+  output_file.write("    if (write_enable == 1'b1) begin\n")
+  output_file.write("      memory[address] <= data_in;\n")
+  output_file.write("    end\n")
+  output_file.write("    data_out <= memory[address];\n")
+  output_file.write("    write_enable <= 1'b0;\n")
   output_file.write("    program_counter <= program_counter + 1;\n")
   output_file.write("    timer <= 16'h0000;\n")
   output_file.write("    case(program_counter)\n")
@@ -258,22 +265,20 @@ def generate_CHIP(input_file, name, frames, output_file, registers, arrays):
         output_file.write("          program_counter <= %s;\n"%(location+1))
         output_file.write("        end\n")
 
-      elif instruction["op"] == "array_read":
+      elif instruction["op"] == "memory_read_request":
         output_file.write(
-          "        register_%s <= ARRAY_%s[register_%s %% %s];\n"%(
-          instruction["dest"],
-          instruction["array"],
-          instruction["index"],
-          instruction["size"]))
+          "        address      <= register_%s;\n"%(instruction["src"])
+        )
 
-      elif instruction["op"] == "array_write":
+      elif instruction["op"] == "memory_read":
         output_file.write(
-          "        ARRAY_%s[register_%s %% %s] <= register_%s;\n"%(
-          instruction["array"],
-          instruction["index"],
-          instruction["size"],
-          instruction["src"]
-        ))
+          "        register_%s <= data_out;\n"%(instruction["dest"])
+        )
+
+      elif instruction["op"] == "memory_write":
+        output_file.write("        address      <= register_%s;\n"%(instruction["src"]))
+        output_file.write("        data_in      <= register_%s;\n"%(instruction["srcb"]))
+        output_file.write("        write_enable <= 1'b1;\n")
 
       elif instruction["op"] == "assert":
         output_file.write( "        if (register_%s == 16'h0000) begin\n"%instruction["src"])
@@ -349,7 +354,7 @@ if __name__ == "__main__":
       output_file = name + ".v"
       output_file = open(output_file, "w")
       generate_CHIP(input_file, name, frames, output_file, parser.allocator.all_registers,
-        parser.allocator.all_arrays)
+        parser.allocator.memory_size)
       output_file.close()
   except C2CHIPError as err:
       print "Error in file:", err.filename, "at line:", err.lineno

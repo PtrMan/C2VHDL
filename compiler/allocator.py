@@ -8,17 +8,13 @@ class Allocator:
 
   def __init__(self, reuse):
     self.registers = []
-    self.arrays = []
-    self.all_arrays = []
     self.all_registers = {}
+    self.memory_size = 0
     self.reuse = reuse
 
   def new_array(self, size):
-    reg = 0
-    while reg in self.arrays:
-      reg += 1
-    self.arrays.append(reg)
-    self.all_arrays.append((reg, size))
+    reg = self.memory_size
+    self.memory_size += int(size)
     return reg
 
   def new(self, name="temporary_register"):
