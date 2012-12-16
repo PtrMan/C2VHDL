@@ -132,7 +132,7 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
       write_declaration("  reg    ", name, size)
 
   memory_size = int(memory_size)
-  output_file.write("  reg [15:0] memory [%i:0];\n"%(size-1))
+  output_file.write("  reg [15:0] memory [%i:0];\n"%(memory_size-1))
 
   #generate clock and reset in testbench mode
   if testbench:
@@ -267,7 +267,7 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
 
       elif instruction["op"] == "memory_read_request":
         output_file.write(
-          "        address      <= register_%s;\n"%(instruction["src"])
+          "        address <= register_%s;\n"%(instruction["src"])
         )
 
       elif instruction["op"] == "memory_read":
@@ -276,8 +276,8 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
         )
 
       elif instruction["op"] == "memory_write":
-        output_file.write("        address      <= register_%s;\n"%(instruction["src"]))
-        output_file.write("        data_in      <= register_%s;\n"%(instruction["srcb"]))
+        output_file.write("        address <= register_%s;\n"%(instruction["src"]))
+        output_file.write("        data_in <= register_%s;\n"%(instruction["srcb"]))
         output_file.write("        write_enable <= 1'b1;\n")
 
       elif instruction["op"] == "assert":
@@ -347,10 +347,10 @@ if __name__ == "__main__":
       process = parser.parse_process()
       name = process.main.name
       instructions = process.generate()
-      if "no_concurent" in sys.argv:
-        frames = [[i] for i in instructions]
-      else:
-        frames = parallelise(instructions)
+      #if "no_concurent" in sys.argv:
+      frames = [[i] for i in instructions]
+      #else:
+      #  frames = parallelise(instructions)
       output_file = name + ".v"
       output_file = open(output_file, "w")
       generate_CHIP(input_file, name, frames, output_file, parser.allocator.all_registers,

@@ -17,7 +17,7 @@ def parallelise(instructions):
     """Return the registers used by this instruction if any"""
 
     registers = []
-    for field in ["src", "srcb", "index"]:
+    for field in ["src", "srcb"]:
       if field in instruction:
         registers.append(instruction[field])
     return registers

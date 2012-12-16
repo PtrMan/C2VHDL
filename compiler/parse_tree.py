@@ -184,37 +184,39 @@ class CompoundDeclaration:
     return instructions
 
 class VariableDeclaration:
-  def __init__(self, allocator, initializer, name):
+  def __init__(self, allocator, initializer, name, type_):
     self.initializer = initializer
     self.allocator = allocator
+    self.type_ = type_
     self.name = name
   def instance(self):
     register = self.allocator.new("variable "+self.name)
-    return VariableInstance(register, self.initializer)
+    return VariableInstance(register, self.initializer, self.type_)
 
 class VariableInstance:
-  def __init__(self, register, initializer):
+  def __init__(self, register, initializer, type_):
     self.register = register
-    self.type_ = "variable"
+    self.type_ = type_
     self.initializer = initializer
   def generate(self):
     return self.initializer.generate(self.register)
 
 class ArrayDeclaration:
-  def __init__(self, allocator, size):
+  def __init__(self, allocator, size, type_):
     self.allocator = allocator
     self.size = size
+    self.type_ = type_
   def instance(self):
     location = self.allocator.new_array(self.size)
     register = self.allocator.new("array")
-    return ArrayInstance(location, register, self.size)
+    return ArrayInstance(location, register, self.size, self.type_)
 
 class ArrayInstance:
-  def __init__(self, location, register, size):
+  def __init__(self, location, register, size, type_):
     self.register = register
     self.location = location
     self.size = size
-    self.type_ = "array"
+    self.type_ = type_
   def generate(self):
       return [{"op":"literal", "literal":self.location, "dest":self.register}]
 
@@ -240,8 +242,8 @@ class StructInstance:
     return instructions
 
 class Argument:
-  def __init__(self, name, parser):
-    self.type_="variable"
+  def __init__(self, name, type_, parser):
+    self.type_=type_
     parser.scope[name] = self
     self.register = parser.allocator.new("function argument "+name)
   def generate(self): return []
@@ -373,10 +375,25 @@ class Ready:
       return [{"op"   :"ready", "dest" :result, "input":self.name}]
 
 class Array:
+  def __init__(self, declaration, allocator):
+    self.declaration = declaration
+    self.allocator = allocator
+    self.storage = "register"
+
+  def generate(self, result):
+    instructions = []
+    if result != self.declaration.register:
+      instructions.append({"op"  :"move",
+                           "dest":result,
+                           "src" :self.declaration.register})
+    return instructions
+
+class ArrayIndex:
   def __init__(self, declaration, index_expression, allocator):
     self.declaration = declaration
     self.allocator = allocator
     self.index_expression = index_expression
+    self.storage = "memory"
 
   def generate(self, result):
     instructions = []
@@ -389,12 +406,16 @@ class Array:
                          "src"   :result})
     instructions.append({"op"    :"memory_read",
                          "dest"  :result})
+    #quick hack to work around memory latency
+    instructions.append({"op"    :"memory_read",
+                         "dest"  :result})
     return instructions
 
 class Variable:
   def __init__(self, declaration, allocator):
     self.declaration = declaration
     self.allocator = allocator
+    self.storage = "register"
 
   def generate(self, result):
     instructions = []
@@ -412,16 +433,13 @@ class Assignment:
 
   def generate(self, result):
     instructions = self.expression.generate(result)
-
-    if self.lvalue.declaration.type_ == "variable":
-
+    if self.lvalue.storage == "register":
       if result != self.lvalue.declaration.register:
         instructions.append({"op"   : "move",
                              "dest" : self.lvalue.declaration.register,
                              "src"  : result})
 
-    elif self.lvalue.declaration.type_ == "array":
-
+    elif self.lvalue.storage == "memory":
       index = self.allocator.new()
       instructions.extend(self.lvalue.index_expression.generate(index))
       instructions.append({"op"    :"+",

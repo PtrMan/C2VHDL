@@ -46,10 +46,15 @@ class Parser:
         function.return_value = self.allocator.new(function.name+" return value")
         function.arguments = []
         while self.tokens.peek() != ")":
-            if self.tokens.get() not in ["int", "short", "long", "char"]:
+            type_ = self.tokens.get()
+            if type_ not in ["int", "short", "long", "char"]:
                 self.tokens.error("unknown type")
             argument = self.tokens.get()
-            function.arguments.append(Argument(argument, self))
+            if self.tokens.peek() == "[":
+                self.tokens.expect("[")
+                self.tokens.expect("]")
+                type_+="[]"
+            function.arguments.append(Argument(argument, type_, self))
             if self.tokens.peek() == ",":
                 self.tokens.expect(",")
             else:
@@ -372,7 +377,8 @@ class Parser:
                 self.tokens.expect("[")
                 size = self.tokens.get()
                 self.tokens.expect("]")
-                declaration = ArrayDeclaration(self.allocator, size)
+                type_+="[]"
+                declaration = ArrayDeclaration(self.allocator, size, type_)
 
             #simple variable declaration 
             else:
@@ -384,7 +390,8 @@ class Parser:
                 declaration = VariableDeclaration(
                     self.allocator, 
                     initializer, 
-                    name
+                    name,
+                    type_
                 )
 
         return declaration
@@ -549,13 +556,16 @@ class Parser:
         return self.parse_variable_array_struct(instance)
  
     def parse_variable_array_struct(self, instance):
-        if instance.type_ == "variable":
+        if instance.type_ in ["int", "short", "long", "char"]:
             return Variable(instance, self.allocator)
-        elif instance.type_ == "array":
-            self.tokens.expect("[")
-            index_expression = self.parse_expression()
-            self.tokens.expect("]")
-            return Array(instance, index_expression, self.allocator)
+        elif instance.type_.endswith("[]"):
+            if self.tokens.peek() == "[":
+                self.tokens.expect("[")
+                index_expression = self.parse_expression()
+                self.tokens.expect("]")
+                return ArrayIndex(instance, index_expression, self.allocator)
+            else:
+                return Array(instance, self.allocator)
         elif instance.type_ == "struct":
             self.tokens.expect(".")
             member = self.tokens.get()

@@ -92,7 +92,7 @@ class Tokens:
                     token = char
   
                 newline = False
-                lineno += 1
+            lineno += 1
   
         self.tokens.extend(tokens)
 
