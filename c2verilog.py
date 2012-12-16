@@ -347,10 +347,10 @@ if __name__ == "__main__":
       process = parser.parse_process()
       name = process.main.name
       instructions = process.generate()
-      #if "no_concurent" in sys.argv:
-      frames = [[i] for i in instructions]
-      #else:
-      #  frames = parallelise(instructions)
+      if "no_concurent" in sys.argv:
+        frames = [[i] for i in instructions]
+      else:
+        frames = parallelise(instructions)
       output_file = name + ".v"
       output_file = open(output_file, "w")
       generate_CHIP(input_file, name, frames, output_file, parser.allocator.all_registers,

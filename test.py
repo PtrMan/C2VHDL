@@ -27,6 +27,120 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test_fails("type_checking 1",
+"""
+int main(){
+  int a[4];
+  int b;
+  b = a;
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 2",
+"""
+int main(){
+  int a[4];
+  int b[4];
+  b[a]=12;
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 3",
+"""
+int main(){
+  int a[4];
+  int b;
+  if(a) b=12;
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 4",
+"""
+int main(){
+  int a[4];
+  int b;
+  while(a) b=12;
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 5",
+"""
+int main(){
+  int a[4];
+  int b;
+  for(;a;) b=12;
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 6",
+"""
+int main(){
+  int a[4];
+  int b;
+  switch(a){}
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 7",
+"""
+int main(){
+  int a[4];
+  int b;
+  switch(b){case a:b=12;}
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 8",
+"""
+int test(int a[]){
+  return 0;
+}
+
+int main(){
+  int b;
+  test(b);
+  return 0;
+}
+
+"""
+)
+
+test_fails("type_checking 9",
+"""
+int test(int a){
+  return 0;
+}
+
+int main(){
+  int b[4];
+  test(b);
+  return 0;
+}
+
+"""
+)
+
 test("array passing 1",
 """
 
@@ -1159,3 +1273,4 @@ os.system("python-coverage run -p c2verilog.py")
 os.system("python-coverage combine")
 os.system("python-coverage report")
 os.system("python-coverage annotate c2verilog.py")
+os.system("python-coverage annotate compiler/parser.py")

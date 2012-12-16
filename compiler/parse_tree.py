@@ -278,6 +278,7 @@ class ANDOR:
     self.left = constant_fold(left)
     self.right = constant_fold(right)
     self.op = op
+    self.type_ = "int"
 
   def generate(self, result):
     instructions = self.left.generate(result)
@@ -298,6 +299,7 @@ class Binary:
     self.right = constant_fold(right)
     self.operator = operator
     self.allocator = allocator
+    self.type_ = self.left.type_
 
   def generate(self, result):
     try:
@@ -328,6 +330,7 @@ class Unary:
   def __init__(self, operator, expression):
     self.expression = constant_fold(expression)
     self.operator = operator
+    self.type_ = self.expression.type_
 
   def generate(self, result):
     instructions = self.expression.generate(result)
@@ -354,6 +357,7 @@ class Output:
   def __init__(self, name, expression):
     self.name = name
     self.expression = expression
+    self.type_ = "int"
 
   def generate(self, result):
     instructions = self.expression.generate(result);
@@ -363,6 +367,7 @@ class Output:
 class Input:
   def __init__(self, name):
     self.name = name
+    self.type_ = "int"
 
   def generate(self, result):
       return [{"op"   :"read", "dest" :result, "input":self.name}]
@@ -370,6 +375,7 @@ class Input:
 class Ready:
   def __init__(self, name):
     self.name = name
+    self.type_ = "int"
 
   def generate(self, result):
       return [{"op"   :"ready", "dest" :result, "input":self.name}]
@@ -379,6 +385,7 @@ class Array:
     self.declaration = declaration
     self.allocator = allocator
     self.storage = "register"
+    self.type_ = self.declaration.type_
 
   def generate(self, result):
     instructions = []
@@ -394,6 +401,7 @@ class ArrayIndex:
     self.allocator = allocator
     self.index_expression = index_expression
     self.storage = "memory"
+    self.type_ = self.declaration.type_.rstrip("[]")
 
   def generate(self, result):
     instructions = []
@@ -416,6 +424,7 @@ class Variable:
     self.declaration = declaration
     self.allocator = allocator
     self.storage = "register"
+    self.type_ = self.declaration.type_
 
   def generate(self, result):
     instructions = []
@@ -430,6 +439,7 @@ class Assignment:
     self.lvalue = lvalue
     self.expression = expression
     self.allocator = allocator
+    self.type_ = "int"
 
   def generate(self, result):
     instructions = self.expression.generate(result)
@@ -456,6 +466,7 @@ class Assignment:
 class Constant:
   def __init__(self, value):
     self._value = value
+    self.type_ = "int"
 
   def generate(self, result):
     instructions = [{"op":"literal", "dest":result, "literal":self._value}]

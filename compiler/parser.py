@@ -38,9 +38,11 @@ class Parser:
         function = Function()
         function.allocator = self.allocator
         stored_scope = self.scope
-        if self.tokens.get() not in ["int", "short", "long", "char"]:
+        type_ = self.tokens.get()
+        if type_ not in ["int", "short", "long", "char"]:
             self.tokens.error("unknown type")
         function.name = self.tokens.get()
+        function.type_ = type_
         self.tokens.expect("(")
         function.return_address = self.allocator.new(function.name+" return address")
         function.return_value = self.allocator.new(function.name+" return value")
@@ -196,6 +198,10 @@ class Parser:
                     self.parse_ternary_expression(), 
                     self.allocator
                 )
+            if lvalue.type_ != expression.type_:
+                self.tokens.error(
+                    "type mismatch in assignment"
+                )
             return Assignment(lvalue, expression, self.allocator)
         else:
             return lvalue
@@ -206,6 +212,10 @@ class Parser:
         self.tokens.expect("if")
         self.tokens.expect("(")
         if_.expression = self.parse_expression()
+        if if_.expression.type_ not in ["int", "short", "long", "char"]:
+            self.tokens.error(
+                "if statement conditional must be an integer like expression"
+            )
         self.tokens.expect(")")
         if_.true_statement = self.parse_statement()
         if self.tokens.peek() == "else":
@@ -221,6 +231,10 @@ class Parser:
         self.tokens.expect("switch")
         self.tokens.expect("(")
         expression = self.parse_expression()
+        if expression.type_ not in ["int", "short", "long", "char"]:
+            self.tokens.error(
+                "switch statement expression must be an integer like expression"
+            )
         self.tokens.expect(")")
         stored_loop = self.loop
         self.loop = switch
@@ -234,6 +248,10 @@ class Parser:
     def parse_case(self):
         self.tokens.expect("case")
         expression = self.parse_expression()
+        if expression.type_ not in ["int", "short", "long", "char"]:
+            self.tokens.error(
+                "case expression must be an integer like expression"
+            )
         self.tokens.expect(":")
         try:
             expression = value(expression)
@@ -278,6 +296,10 @@ class Parser:
         break_ = Break()
         break_.loop = loop
         if_.allocator = self.allocator
+        if expression.type_ not in ["int", "short", "long", "char"]:
+            self.tokens.error(
+                "if statement conditional must be an integer like expression"
+            )
         if_.expression = expression
         if_.false_statement = break_
         if_.true_statement = statement
@@ -294,6 +316,10 @@ class Parser:
         self.tokens.expect(";")
         if self.tokens.peek() != ";":
             for_.expression = self.parse_expression()
+            if for_.expression.type_ not in ["int", "short", "long", "char"]:
+                self.tokens.error(
+                    "for statement conditional must be an integer like expression"
+                )
         self.tokens.expect(";")
         if self.tokens.peek() != ")":
             for_.statement2 = self.parse_discard()
@@ -532,6 +558,7 @@ class Parser:
             self.tokens.error("Unknown function: %s"%name)
 
         function_call.function = self.scope[name]
+        function_call.type_ = function_call.function.type_
         required_arguments = len(function_call.function.arguments)
         actual_arguments = len(function_call.arguments)
         if required_arguments != actual_arguments:
@@ -540,6 +567,16 @@ class Parser:
                 len(function_call.function.arguments),
                 len(function_call.arguments)
             ))
+        required_arguments = function_call.function.arguments
+        actual_arguments = function_call.arguments
+        for required, actual in zip(required_arguments, actual_arguments):
+            if required.type_ != actual.type_:
+                self.tokens.error("Type mismatch expected type : %s got: %s."%(
+                    required.type_,
+                    actual.type_
+                ))
+
+
         return function_call
 
     def parse_number(self):
@@ -563,6 +600,10 @@ class Parser:
                 self.tokens.expect("[")
                 index_expression = self.parse_expression()
                 self.tokens.expect("]")
+                if index_expression.type_ not in ["int", "short", "long", "char"]:
+                    self.tokens.error(
+                        "array indices must be an integer like expression"
+                    )
                 return ArrayIndex(instance, index_expression, self.allocator)
             else:
                 return Array(instance, self.allocator)
