@@ -36,12 +36,16 @@ def truncate(number):
 class Process:
   def generate(self):
     instructions = []
+    for function in self.functions:
+      if hasattr(function, "declarations"):
+          instructions.extend(function.generate())
     instructions.append({"op"   :"jmp_and_link",
                          "dest" :self.main.return_address,
                          "label":"function_%s"%id(self.main)})
     instructions.append({"op":"stop"})
     for function in self.functions:
-      instructions.extend(function.generate())
+      if not hasattr(function, "declarations"):
+          instructions.extend(function.generate())
     return instructions
 
 class Function:

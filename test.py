@@ -27,6 +27,55 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("global variables 1",
+"""
+int a;
+
+void test(){
+  assert(a==12);
+  a = 24;
+}
+
+void main(){
+  a = 12;
+  test();
+  assert(a==24);
+}
+
+"""
+)
+
+
+test("global variables 2",
+"""
+int a[10];
+
+void test(){
+  assert(a[0] == 0);
+  assert(a[1] == 1);
+  assert(a[2] == 2);
+  assert(a[3] == 3);
+  a[0] = 4;
+  a[1] = 5;
+  a[2] = 6;
+  a[3] = 7;
+}
+
+void main(){
+  a[0] = 0;
+  a[1] = 1;
+  a[2] = 2;
+  a[3] = 3;
+  test();
+  assert(a[0] == 4);
+  assert(a[1] == 5);
+  assert(a[2] == 6);
+  assert(a[3] == 7);
+}
+
+"""
+)
+
 test("void functions 1",
 """
 void main(){

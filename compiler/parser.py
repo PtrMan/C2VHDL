@@ -39,11 +39,18 @@ class Parser:
         function.allocator = self.allocator
         stored_scope = self.scope
         type_ = self.tokens.get()
+        name = self.tokens.get()
         if type_ not in ["int", "short", "long", "char", "void"]:
             self.tokens.error("unknown type")
-        function.name = self.tokens.get()
-        function.type_ = type_
+        
+        #check if it is a global declaration
+        if self.tokens.peek() != "(" and type_ != "void":
+            return self.parse_global_declaration(type_, name)
+
+        #otherwise continue parsing a function
         self.tokens.expect("(")
+        function.name = name
+        function.type_ = type_
         function.return_address = self.allocator.new(function.name+" return address")
         if type_ != "void":
             function.return_value = self.allocator.new(function.name+" return value")
@@ -379,6 +386,20 @@ class Parser:
         self.scope[name] = instance
         return instance
 
+    def parse_global_declaration(self, type_, name):
+        instances = []
+        while True:
+            instance = self.parse_declaration(type_, name).instance()
+            self.scope[name] = instance
+            instances.append(instance)
+            if self.tokens.peek() == ",":
+                self.tokens.expect(",")
+            else:
+                break
+            name = self.tokens.get()
+        self.tokens.expect(";")
+        return CompoundDeclaration(instances)
+
     def parse_compound_declaration(self):
         type_ = self.tokens.get()
         instances = []
@@ -391,11 +412,11 @@ class Parser:
                 self.tokens.expect(",")
             else:
                 break
+            name = None
         self.tokens.expect(";")
         return CompoundDeclaration(instances)
 
     def parse_declaration(self, type_, name):
-
         #struct declaration
         if type_ in self.structs:
             declaration = self.scope[type_]
