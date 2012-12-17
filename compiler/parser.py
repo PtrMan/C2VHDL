@@ -40,11 +40,11 @@ class Parser:
         stored_scope = self.scope
         type_ = self.tokens.get()
         name = self.tokens.get()
-        if type_ not in ["int", "short", "long", "char", "void"]:
-            self.tokens.error("unknown type")
         
         #check if it is a global declaration
-        if self.tokens.peek() != "(" and type_ != "void":
+        if self.tokens.peek() != "(":
+            if type_ not in ["int", "short", "long", "char"] + self.structs:
+                self.tokens.error("unknown type")
             return self.parse_global_declaration(type_, name)
 
         #otherwise continue parsing a function
@@ -52,6 +52,8 @@ class Parser:
         function.name = name
         function.type_ = type_
         function.return_address = self.allocator.new(function.name+" return address")
+        if type_ not in ["int", "short", "long", "char", "void"]:
+            self.tokens.error("unknown type")
         if type_ != "void":
             function.return_value = self.allocator.new(function.name+" return value")
         function.arguments = []

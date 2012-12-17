@@ -105,6 +105,32 @@ void main(){
 """
 )
 
+test("global variables 4",
+"""
+typedef struct {int a; int b; int c;} blah;
+blah myblah;
+
+void test(){
+  assert(myblah.a == 1);
+  assert(myblah.b == 2);
+  assert(myblah.c == 3);
+  myblah.a = 4;
+  myblah.b = 5;
+  myblah.c = 6;
+}
+  
+void main(){
+  myblah.a = 1;
+  myblah.b = 2;
+  myblah.c = 3;
+  test();
+  assert(myblah.a == 4);
+  assert(myblah.b == 5);
+  assert(myblah.c == 6);
+}
+"""
+)
+
 test("void functions 1",
 """
 void main(){
