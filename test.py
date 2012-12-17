@@ -76,6 +76,35 @@ void main(){
 """
 )
 
+test("global variables 3",
+"""
+int a=0, b=1, c=2;
+
+void test(){
+  assert(a == 3);
+  assert(b == 4);
+  assert(c == 5);
+  a=6;
+  b=7;
+  c=8;
+}
+
+void main(){
+  assert(a == 0);
+  assert(b == 1);
+  assert(c == 2);
+  a=3;
+  b=4;
+  c=5;
+  test();
+  assert(a == 6);
+  assert(b == 7);
+  assert(c == 8);
+}
+
+"""
+)
+
 test("void functions 1",
 """
 void main(){
