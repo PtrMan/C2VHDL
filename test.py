@@ -27,6 +27,36 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("struct with array 1",
+"""
+typedef struct {int a; int b; int c[2];} blah;
+blah myblah;
+
+void test(){
+  assert(myblah.a == 1);
+  assert(myblah.b == 2);
+  assert(myblah.c[0] == 3);
+  assert(myblah.c[1] == 4);
+  myblah.a = 5;
+  myblah.b = 6;
+  myblah.c[0] = 7;
+  myblah.c[1] = 8;
+}
+  
+void main(){
+  myblah.a = 1;
+  myblah.b = 2;
+  myblah.c[0] = 3;
+  myblah.c[1] = 4;
+  test();
+  assert(myblah.a == 5);
+  assert(myblah.b == 6);
+  assert(myblah.c[0] == 7);
+  assert(myblah.c[1] == 8);
+}
+"""
+)
+
 test("global variables 1",
 """
 int a;
@@ -44,7 +74,6 @@ void main(){
 
 """
 )
-
 
 test("global variables 2",
 """
