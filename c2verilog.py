@@ -347,7 +347,7 @@ if __name__ == "__main__":
       process = parser.parse_process()
       name = process.main.name
       instructions = process.generate()
-      if "no_concurent" in sys.argv:
+      if "no_concurrent" in sys.argv:
         frames = [[i] for i in instructions]
       else:
         frames = parallelise(instructions)

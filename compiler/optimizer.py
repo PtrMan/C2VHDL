@@ -53,17 +53,15 @@ def parallelise(instructions):
           return True
         if modifies_register(i) == modifies_register(instruction):
           return True
-      if accesses_memory(i):
-        if accesses_memory(instruction):
+      if accesses_memory(i) and accesses_memory(instruction):
           return True
       if is_jump(i):
         return True
     for i in preceding:
-      if modifies_register(i) is not None:
+      if modifies_register(instruction) is not None:
         if modifies_register(instruction) in uses_registers(i):
           return True
-      if accesses_memory(i):
-        if accesses_memory(instruction):
+      if accesses_memory(i) and accesses_memory(instruction):
           return True
     if is_jump(instruction) and preceding:
       return True
