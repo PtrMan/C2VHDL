@@ -27,6 +27,58 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("void functions 1",
+"""
+void main(){
+  int a;
+  int b;
+  b = a;
+}
+
+"""
+)
+
+test("void functions 2",
+"""
+void test(){
+  return;
+}
+
+void main(){
+  test();
+}
+
+"""
+)
+
+test_fails("void functions 3",
+"""
+void test(){
+  return;
+}
+
+void main(){
+  int a;
+  a = test();
+}
+
+"""
+)
+
+test_fails("void functions 4",
+"""
+void test(){
+  return 10;
+}
+
+void main(){
+  int a;
+  a = test();
+}
+
+"""
+)
+
 test_fails("type_checking 1",
 """
 int main(){

@@ -39,13 +39,14 @@ class Parser:
         function.allocator = self.allocator
         stored_scope = self.scope
         type_ = self.tokens.get()
-        if type_ not in ["int", "short", "long", "char"]:
+        if type_ not in ["int", "short", "long", "char", "void"]:
             self.tokens.error("unknown type")
         function.name = self.tokens.get()
         function.type_ = type_
         self.tokens.expect("(")
         function.return_address = self.allocator.new(function.name+" return address")
-        function.return_value = self.allocator.new(function.name+" return value")
+        if type_ != "void":
+            function.return_value = self.allocator.new(function.name+" return value")
         function.arguments = []
         while self.tokens.peek() != ")":
             type_ = self.tokens.get()
@@ -64,7 +65,7 @@ class Parser:
         self.tokens.expect(")")
         self.function = function
         function.statement = self.parse_statement()
-        if not hasattr(function, "return_statement"):
+        if type_ != "void" and not hasattr(function, "return_statement"):
             self.tokens.error("Function must have a return statement")
         self.function = None
         self.scope = stored_scope
@@ -92,7 +93,8 @@ class Parser:
         return_.function = self.function
         self.function.return_statement = return_
         self.tokens.expect("return")
-        return_.expression = self.parse_expression()
+        if hasattr(self.function, "return_value"):
+            return_.expression = self.parse_expression()
         self.tokens.expect(";")
         return return_
 

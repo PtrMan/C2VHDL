@@ -49,6 +49,8 @@ class Function:
     instructions = []
     instructions.append({"op":"label", "label":"function_%s"%id(self)})
     instructions.extend(self.statement.generate())
+    if not hasattr(self, "return_value"):
+        instructions.append({"op":"jmp_to_reg", "src":self.return_address})
     return instructions
 
 class Break:
@@ -67,7 +69,10 @@ class Assert:
 
 class Return:
   def generate(self):
-    instructions = self.expression.generate(self.function.return_value)
+    if hasattr(self, "expression"):
+        instructions = self.expression.generate(self.function.return_value)
+    else:
+        instructions = []
     instructions.append({"op":"jmp_to_reg", "src":self.function.return_address})
     return instructions
 
@@ -348,9 +353,10 @@ class FunctionCall:
     instructions.append({"op"   :"jmp_and_link",
                          "dest" :self.function.return_address,
                          "label":"function_%s"%id(self.function)})
-    instructions.append({"op"   :"move",
-                         "dest" :result,
-                         "src"  :self.function.return_value})
+    if hasattr(self.function, "return_value"):
+        instructions.append({"op"   :"move",
+                             "dest" :result,
+                             "src"  :self.function.return_value})
     return instructions
 
 class Output:
