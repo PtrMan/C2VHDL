@@ -79,6 +79,19 @@ class Tokens:
                     else:
                         tokens.append((filename, lineno, token))
                         token = char
+
+                #character literal
+                elif token[0] == "'":
+                    if len(token) == 1:
+                        token += char
+                    elif len(token) == 2:
+                        if char == "'":
+                            token += char
+                        else:
+                            self.error("Expeceting : '\n", filename, lineno)
+                    else:
+                        tokens.append((filename, lineno, token))
+                        token = char
     
                 #operator
                 elif token in operators:

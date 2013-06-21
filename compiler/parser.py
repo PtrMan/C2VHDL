@@ -605,11 +605,18 @@ class Parser:
         return function_call
 
     def parse_number(self):
-        try:
-            token = self.tokens.get()
-            return Constant(eval(token))
-        except SyntaxError:
-            self.tokens.error("%s is not a number"%token)
+        token = self.tokens.get()
+        if token.startswith("'"):
+            try:
+                value = ord(eval(token))
+            except SyntaxError:
+                self.tokens.error("%s is not a character literal"%token)
+        else:
+            try:
+                value = int(eval(token))
+            except SyntaxError:
+                self.tokens.error("%s is not an integer literal"%token)
+        return Constant(value)
 
     def parse_variable(self, name):
         if name not in self.scope:

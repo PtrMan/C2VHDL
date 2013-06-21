@@ -27,6 +27,44 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("char 1",
+"""
+int main(){
+  int char = 'a';
+  assert(char == 97);
+  return 0;
+}
+
+""")
+test("char 2",
+"""
+int main(){
+  int char = 'A';
+  assert(char == 65);
+  return 0;
+}
+
+""")
+test("char 3",
+"""
+int main(){
+  int char = '1';
+  assert(char == 49);
+  return 0;
+}
+
+""")
+test_fails("char 4",
+"""
+int main(){
+  int char = '1;
+  report(char);
+  assert(char == 49);
+  return 0;
+}
+
+""")
+
 test("division 1",
 """
 int main(){
