@@ -27,6 +27,160 @@ def test_fails(test, code):
   else:
     print test, "...pass"
 
+test("division 1",
+"""
+int main(){
+  int a = 15;
+  int b = 3;
+  assert(a/b == 5);
+  return 0;
+}
+
+""")
+
+test("division 2",
+"""
+int main(){
+  int a = 12;
+  int b = 4;
+  assert(a/b == 3);
+  return 0;
+}
+
+""")
+
+test("division 3",
+"""
+int main(){
+  int a = 1;
+  int b = 1;
+  assert(a/b == 1);
+  return 0;
+}
+
+""")
+
+test("division 4",
+"""
+int main(){
+  int a = 1;
+  int b = -1;
+  assert(a/b == -1);
+  return 0;
+}
+
+""")
+
+test("division 5",
+"""
+int main(){
+  int a = -1;
+  int b = 1;
+  assert(a/b == -1);
+  return 0;
+}
+
+""")
+
+test("division 6",
+"""
+int main(){
+  int a = 0;
+  int b = 1;
+  assert(a/b == 0);
+  return 0;
+}
+
+""")
+
+test("division 7",
+"""
+int main(){
+  int a = 5;
+  int b = 2;
+  assert(a/b == 2);
+  return 0;
+}
+
+""")
+
+test("division 8",
+"""
+int main(){
+  int a = -5;
+  int b = 2;
+  assert(a/b == -2);
+  return 0;
+}
+
+""")
+
+test("division 9",
+"""
+int main(){
+  int a = 0;
+  int b = 32767;
+  assert(a/b == 0);
+  return 0;
+}
+
+""")
+
+test("division 10",
+"""
+int main(){
+  int a = 32767;
+  int b = 1;
+  assert(a/b == 32767);
+  return 0;
+}
+
+""")
+
+test("division 11",
+"""
+int main(){
+  int a = 32767;
+  int b = 2;
+  assert(a/b == 16383);
+  return 0;
+}
+
+""")
+
+test("division 12",
+"""
+int main(){
+  int a = 32767;
+  int b = 32767;
+  assert(a/b == 1);
+  return 0;
+}
+
+""")
+
+test("division 13",
+"""
+int main(){
+  int a = -32768;
+  int b = -32768;
+  assert(a/b == 1);
+  return 0;
+}
+
+""")
+
+test("division 14",
+"""
+int main(){
+  int a = -32767;
+  int b = -1;
+  assert(a/b == 32767);
+  return 0;
+}
+
+""")
+
 test("struct with array 1",
 """
 typedef struct {int a; int b; int c[2];} blah;

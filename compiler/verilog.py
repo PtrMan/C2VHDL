@@ -63,7 +63,8 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
     ("divisor", 16),
     ("dividend", 16),
     ("quotient", 16),
-    ("count", 4),
+    ("remainder", 16),
+    ("count", 5),
     ("state", 2),
     ("stb", 1),
     ("ack", 1),
@@ -78,6 +79,7 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
     ("start", 2, 0),
     ("calculate", 2, 1),
     ("finish", 2, 2),
+    ("acknowledge", 2, 3),
   ]
 
   #create list of signals
@@ -240,6 +242,48 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
           instruction["dest"],
           instruction["src"]))
 
+      elif instruction["op"] in ["/"] and "left" in instruction:
+
+        output_file.write(
+          "        divisor  <= $signed(16'd%i);\n"%(instruction["left"]&0xffff))
+        output_file.write(
+          "        dividend <= $signed(register_%s);\n"%instruction["srcb"])
+        output_file.write(
+          "        register_%s <= quotient;\n"%instruction["dest"])
+        output_file.write("        stb <= 1'b0;\n")
+        output_file.write("        if (ack != 1'b1) begin\n")
+        output_file.write("          program_counter <= %s;\n"%location)
+        output_file.write("          stb <= 1'b1;\n")
+        output_file.write("        end\n")
+
+      elif instruction["op"] in ["/"] and "right" in instruction:
+
+        output_file.write(
+          "        divisor  <= $signed(register_%s);\n"%instruction["src"])
+        output_file.write(
+          "        dividend <= $signed(16'd%i);\n"%(instruction["right"]&0xffff))
+        output_file.write(
+          "        register_%s <= quotient;\n"%instruction["dest"])
+        output_file.write("        stb <= 1'b0;\n")
+        output_file.write("        if (ack != 1'b1) begin\n")
+        output_file.write("          program_counter <= %s;\n"%location)
+        output_file.write("          stb <= 1'b1;\n")
+        output_file.write("        end\n")
+        output_file.write("        $display(stb);")
+
+      elif instruction["op"] in ["/"]:
+        output_file.write(
+          "        divisor  <= $signed(register_%s);\n"%instruction["src"])
+        output_file.write(
+          "        dividend <= $signed(register_%s);\n"%instruction["srcb"])
+        output_file.write(
+          "        register_%s <= quotient;\n"%instruction["dest"])
+        output_file.write("        stb <= 1'b0;\n")
+        output_file.write("        if (ack != 1'b1) begin\n")
+        output_file.write("          program_counter <= %s;\n"%location)
+        output_file.write("          stb <= 1'b1;\n")
+        output_file.write("        end\n")
+
       elif instruction["op"] in binary_operators and "left" in instruction:
         output_file.write(
           "        register_%s <= $signed(16'd%s) %s $signed(register_%s);\n"%(
@@ -357,13 +401,15 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
       elif instruction["op"] == "stop":
         output_file.write('        $finish;\n')
         output_file.write("        program_counter <= program_counter;\n")
-      output_file.write("\n")
-    output_file.write("      end\n")
+    output_file.write("      end\n\n")
 
   output_file.write("    endcase\n")
 
   #Reset program counter and control signals
-  output_file.write("    if (rst == 1'b1) program_counter <= 0;\n")
+  output_file.write("    if (rst == 1'b1) begin\n")
+  output_file.write("      program_counter <= 0;\n")
+  output_file.write("      stb <= 1'b0;\n")
+  output_file.write("    end\n")
   output_file.write("  end\n")
   for i in inputs:
     output_file.write("  assign input_%s_ack = s_input_%s_ack;\n"%(i, i))
@@ -387,23 +433,31 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
   output_file.write("    ack <= 1'b0;\n\n")
   output_file.write("    case (state)\n\n")
   output_file.write("      start: begin\n\n")
-  output_file.write("        a     <= divisor[15]?-divisor:divisor;\n")
-  output_file.write("        b     <= dividend[15]?-dividend:dividend;\n")
+  output_file.write("        a <= divisor[15]?-divisor:divisor;\n")
+  output_file.write("        b <= dividend[15]?-dividend:dividend;\n")
+  output_file.write("        remainder <= 15'd0;\n")
+  output_file.write("        z <= 15'd0;\n")
   output_file.write("        sign  <= divisor[15] ^ dividend[15];\n")
-  output_file.write("        count <= 4'd15;\n\n")
-  output_file.write("        if( start == 1'b1 ) begin\n")
+  output_file.write("        count <= 5'd16;\n\n")
+  output_file.write("        if( stb == 1'b1 ) begin\n")
   output_file.write("          state <= calculate;\n")
   output_file.write("        end\n\n")
   output_file.write("      end //start\n\n")
   output_file.write("      calculate: begin\n\n")
-  output_file.write("        if( difference[15] == 0 ) begin //if a > b\n")
-  output_file.write("          z <= {z[14:0], 1'b1};\n")
-  output_file.write("          a <= {difference[14:0], 1'b0};\n")
+  output_file.write("        if( difference[15] == 0 ) begin //if remainder > b\n")
+  output_file.write("          z <= z * 2 + 1;\n")
+  output_file.write("          remainder <= {difference[14:0], a[15]};\n")
   output_file.write("        end else begin\n")
-  output_file.write("          z <= {z[14:1], 1'b1};\n")
-  output_file.write("          a <= {a[14:1], 1'b0};\n")
+  output_file.write("          z <= z * 2;\n")
+  output_file.write("          remainder <= {remainder[14:0], a[15]};\n")
   output_file.write("        end\n\n")
-  output_file.write("        if( count == 4'd0 ) begin\n")
+  output_file.write("        a <= a * 2;\n")
+#  output_file.write('        $display("count %d", count);')
+#  output_file.write('        $display("remainder %b", remainder);')
+#  output_file.write('        $display("a %b", a);')
+#  output_file.write('        $display("b %b", b);')
+#  output_file.write('        $display("z %b", z);')
+  output_file.write("        if( count == 5'd0 ) begin\n")
   output_file.write("          state <= finish;\n")
   output_file.write("        end else begin\n")
   output_file.write("          count <= count - 1;\n")
@@ -412,15 +466,17 @@ def generate_CHIP(input_file, name, frames, output_file, registers, memory_size)
   output_file.write("      finish: begin\n\n")
   output_file.write("        quotient <= sign?-z:z;\n")
   output_file.write("        ack      <= 1'b1;\n")
-  output_file.write("        state    <= start;\n\n")
+  output_file.write("        state    <= acknowledge;\n\n")
   output_file.write("      end //finish\n\n")
+  output_file.write("      acknowledge: begin\n\n")
+  output_file.write("        ack      <= 1'b0;\n")
+  output_file.write("        state    <= start;\n\n")
+  output_file.write("      end //wait\n\n")
   output_file.write("    endcase\n\n")
   output_file.write("    if( rst == 1'b1 ) begin\n")
+  output_file.write("      ack   <= 1'b0;\n")
   output_file.write("      state <= start;\n")
   output_file.write("    end //if\n")
   output_file.write("  end\n\n")
-  output_file.write("  assign difference = a - b;\n\n")
-  output_file.write("\n  //////////////////////////////////////////////////////////////////////////////\n")
-  output_file.write("  // END OF SERIAL DIVIDER\n")
-
+  output_file.write("  assign difference = remainder - b;\n\n")
   output_file.write("\nendmodule\n")
