@@ -16,6 +16,7 @@ from compiler.tokens import Tokens
 from compiler.verilog import generate_CHIP
 
 from TreeMatcher import TreeMatcher
+from LimitedTreeTransformer import LimitedTreeTransformer
 
 #Command Line Application
 ####################################################################################################
@@ -51,6 +52,17 @@ if __name__ == "__main__":
                 print "no match"
 
             matchesRules = TreeMatcher.doesMatchSimpleBinaryOperations(returnStatement.expression)
+
+            if not matchesRules:
+                print "doesn't match simple binary operations!"
+
+            treeTransformer = LimitedTreeTransformer()
+            validateResult = treeTransformer.validate(returnStatement.expression)
+
+            if not validateResult:
+                print "doesn't match implemeneted operations!"
+
+            TODO = treeTransformer.transform(returnStatement.expression)
 
             print matchesRules
 
