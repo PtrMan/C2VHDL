@@ -18,6 +18,8 @@ class DagElement(object):
         self.varId = 0
         self.isOutput = False # not needed????
 
+
+
     def debug(self):
         returnString = ""
 

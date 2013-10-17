@@ -42,15 +42,12 @@ class LimitedTreeTransformer(object):
     ##
     #
     # \return the id of the top dag element
-    def transform(self, binaryExpression):
-        self._resetDag()
+    def transform(self, binaryExpression, dagElementFactory):
+        self.dag = Dag(dagElementFactory)
 
         topDagElement = self._recursivlyConvertBinaryExpressionIntoDag(binaryExpression)
 
         return topDagElement
-
-    def _resetDag(self):
-        self.dag = Dag()
 
     def _recursivlyConvertBinaryExpressionIntoDag(self, expression):
         if isinstance(expression, compiler.parse_tree.Binary):
@@ -79,3 +76,6 @@ class LimitedTreeTransformer(object):
         else:
             # TODO< throw internal error >
             pass
+
+    def getDag(self):
+        return self.dag

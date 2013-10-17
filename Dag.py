@@ -3,11 +3,13 @@ from DagElement import *
 ## Directed Acyclic Graph
 #
 class Dag(object):
-    def __init__(self):
+    def __init__(self, dagElementFactory):
         # this is the Dag as a list
         # contains only 'DAGElement' objects
         # NOTE< can'T use pointers in the native code for this >
         self.content = []
+
+        self._dagElementFactory = dagElementFactory
 
     def addOperation(self, operationType, nodeA, nodeB = None):
         # search for the Operation with the Same Properties
@@ -24,7 +26,7 @@ class Dag(object):
 
             i += 1
 
-        newElement = DagElement(operationType)
+        newElement = self._dagElementFactory.createDagElement(operationType)
         newElement.nodeA = nodeA
         newElement.nodeB = nodeB
 
@@ -53,7 +55,7 @@ class Dag(object):
         else:
             i = len(self.content)
 
-        newElement = DagElement(DagElement.EnumOperationType.VAR)
+        newElement = self._dagElementFactory.createDagElement(DagElement.EnumOperationType.VAR)
         newElement.varId = varId
 
         self.content.append(newElement)
@@ -63,7 +65,7 @@ class Dag(object):
     def addConstant(self, value):
         i = len(self.content)
 
-        newElement = DagElement(DagElement.EnumOperationType.CONST)
+        newElement = self._dagElementFactory.createDagElement(DagElement.EnumOperationType.CONST)
 
         self.content.append(newElement)
 

@@ -17,6 +17,8 @@ from compiler.verilog import generate_CHIP
 
 from TreeMatcher import TreeMatcher
 from LimitedTreeTransformer import LimitedTreeTransformer
+from FlowChart import *
+from DecoratedDagElementFactory import *
 
 #Command Line Application
 ####################################################################################################
@@ -51,10 +53,14 @@ if __name__ == "__main__":
             if not isinstance(returnStatement.expression, compiler.parse_tree.Binary):
                 print "no match"
 
+                raise Exception
+
             matchesRules = TreeMatcher.doesMatchSimpleBinaryOperations(returnStatement.expression)
 
             if not matchesRules:
                 print "doesn't match simple binary operations!"
+
+                raise Exception
 
             treeTransformer = LimitedTreeTransformer()
             validateResult = treeTransformer.validate(returnStatement.expression)
@@ -62,7 +68,17 @@ if __name__ == "__main__":
             if not validateResult:
                 print "doesn't match implemeneted operations!"
 
-            TODO = treeTransformer.transform(returnStatement.expression)
+                raise Exception
+
+            decoratedDagElementFactory = DecoratedDagElementFactory()
+
+            topDagElementIndex = treeTransformer.transform(returnStatement.expression, decoratedDagElementFactory)
+
+            flowchartForDag = FlowChart()
+
+            flowchartForDag.calcFlowChart(treeTransformer.getDag())
+
+
 
             print matchesRules
 
@@ -76,7 +92,8 @@ if __name__ == "__main__":
             #else:
             #    unimplemented
         else:
-            unimplemented
+            # unimplemented
+            raise Exception
 
         name = process.main.name
         instructions = process.generate()
