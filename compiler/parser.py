@@ -35,8 +35,8 @@ class Parser:
         return process
 
     def parse_function(self):
-        function = Function()
-        function.allocator = self.allocator
+        function = Function(self.allocator)
+
         stored_scope = self.scope
         type_ = self.tokens.get()
         name = self.tokens.get()
