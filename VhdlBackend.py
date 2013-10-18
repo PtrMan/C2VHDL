@@ -1,27 +1,3 @@
-
-"""
-
-entity x is
-port(
-    clk : in TODO;
-    a : in TODO;
-    b : in TODO;
-    c : in TODO;
-    d : out TODO
-)
-end entity x;
-
-architecture standard of x is
-begin
-    process0: process(TODO) is
-    begin
-        if rising_edge(clk) then
-
-        end if;
-    end process0;
-end architecture standard;
-"""
-
 def unique(l):
 
     """In the absence of set in older python implementations, make list values unique"""
@@ -93,12 +69,9 @@ class VhdlBackend(object):
     
         #create list of signals
         signals = [
-                      ("timer", 16),
+
                       ("program_counter", len(frames)),
-                      ("address", 16),
-                      ("data_out", 16),
-                      ("data_in", 16),
-                      ("write_enable", 1),
+
                       ] + [
                       ("register_%s"%(register), 16) for register in registers
                   ] + [
@@ -126,15 +99,6 @@ class VhdlBackend(object):
         
         self._writeInports(inports)
         self._writeOutports(outports)
-
-        #for name, size in wires:
-        #    self._writeDeclaration("  wire      ", name, size)
-    
-        #for name, size, value in parameters:
-        #    self._writeDeclaration("  parameter ", name, size, value)
-    
-        #memorySize = int(memorySize)
-        #self.outputFile.write("  reg [15:0] memory [%i:0];\n"%(memorySize-1))
     
         # generate clock and reset in testbench mode
         if False:
@@ -165,7 +129,6 @@ class VhdlBackend(object):
     
         # Generate a state machine to execute the instructions
 
-
         self.outputFile.write("\n")
         self.outputFile.write("  --------------------\n")
         self.outputFile.write("  -- FSM IMPLEMENTATION OF C PROCESS\n")
@@ -186,38 +149,12 @@ class VhdlBackend(object):
 
         self._writeFsmOutro()
 
-    
-        # Reset program counter and control signals
-        #self.outputFile.write("    if (rst == 1'b1) begin\n")
-        #self.outputFile.write("      program_counter <= 0;\n")
-        #self.outputFile.write("      stb <= 1'b0;\n")
-        #self.outputFile.write("    end\n")
-
-        #for i in inputs:
-        #    self.outputFile.write("  assign input_%s_ack = s_input_%s_ack;\n"%(i, i))
-        #for i in outputs:
-        #    self.outputFile.write("  assign output_%s_stb = s_output_%s_stb;\n"%(i, i))
-        #    self.outputFile.write("  assign output_%s = s_output_%s;\n"%(i, i))
-
         self._endModule()
     
     def _writeDeclaration(self, objectType, name, size, value=None):
         initialisation = "0" * size
 
         self.outputFile.write("  signal %s: std_logic_vector(%s downto 0) := \"%s\";\n" % (name, size-1, initialisation))
-
-        #if size == 1:
-        #    self.outputFile.write(name)
-        #    if value is not None:
-        #        self.outputFile.write("= %s'd%s"%(size,value))
-        #    self.outputFile.write(";\n")
-        #else:
-        #    self.outputFile.write("[%i:0]"%(size-1))
-        #    self.outputFile.write(" ")
-        #    self.outputFile.write(name)
-        #    if value is not None:
-        #        self.outputFile.write("= %s'd%s"%(size,value))
-        #    self.outputFile.write(";\n")
 
     ## ...
     #
@@ -274,53 +211,6 @@ class VhdlBackend(object):
             self._writeInstructionStop(instruction)
         else:
             raise Exception
-
-        """
-
-                elif instruction["op"] in ["/"] and "left" in instruction:
-
-                    self.outputFile.write(
-                        "        divisor  <= $signed(16'd%i);\n"%(instruction["left"]&0xffff))
-                    self.outputFile.write(
-                        "        dividend <= $signed(register_%s);\n"%instruction["srcb"])
-                    self.outputFile.write(
-                        "        register_%s <= quotient;\n"%instruction["dest"])
-                    self.outputFile.write("        stb <= 1'b0;\n")
-                    self.outputFile.write("        if (ack != 1'b1) begin\n")
-                    self.outputFile.write("          program_counter <= %s;\n"%self.location)
-                    self.outputFile.write("          stb <= 1'b1;\n")
-                    self.outputFile.write("        end\n")
-
-                elif instruction["op"] in ["/"] and "right" in instruction:
-
-                    self.outputFile.write(
-                        "        divisor  <= $signed(register_%s);\n"%instruction["src"])
-                    self.outputFile.write(
-                        "        dividend <= $signed(16'd%i);\n"%(instruction["right"]&0xffff))
-                    self.outputFile.write(
-                        "        register_%s <= quotient;\n"%instruction["dest"])
-                    self.outputFile.write("        stb <= 1'b0;\n")
-                    self.outputFile.write("        if (ack != 1'b1) begin\n")
-                    self.outputFile.write("          program_counter <= %s;\n"%self.location)
-                    self.outputFile.write("          stb <= 1'b1;\n")
-                    self.outputFile.write("        end\n")
-                    self.outputFile.write("        $display(stb);")
-
-                elif instruction["op"] in ["/"]:
-                    self.outputFile.write(
-                        "        divisor  <= $signed(register_%s);\n"%instruction["src"])
-                    self.outputFile.write(
-                        "        dividend <= $signed(register_%s);\n"%instruction["srcb"])
-                    self.outputFile.write(
-                        "        register_%s <= quotient;\n"%instruction["dest"])
-                    self.outputFile.write("        stb <= 1'b0;\n")
-                    self.outputFile.write("        if (ack != 1'b1) begin\n")
-                    self.outputFile.write("          program_counter <= %s;\n"%self.location)
-                    self.outputFile.write("          stb <= 1'b1;\n")
-                    self.outputFile.write("        end\n")
-        """
-
-
 
     def _writeInstructionLiteral(self, instruction):
         raise NotImplementedError
@@ -710,13 +600,5 @@ class VhdlBackend(object):
     def _writePreFrame(self, location):
         self.outputFile.write("      when %s =>\n" % (location,))
 
-        # old verilog code
-        #self.outputFile.write("      %s:\n"%location)
-        #self.outputFile.write("      begin\n")
-
     def _writePostFrame(self):
-        # do nothing
-        return
-
-        # old verilog code
-        #self.outputFile.write("      end\n\n")
+        pass
