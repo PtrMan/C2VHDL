@@ -13,7 +13,8 @@ from compiler.parser import Parser
 from compiler.exceptions import C2CHIPError
 from compiler.optimizer import parallelise
 from compiler.tokens import Tokens
-from compiler.verilog import generate_CHIP
+
+from VhdlBackend import VhdlBackend
 
 from TreeMatcher import TreeMatcher
 from LimitedTreeTransformer import LimitedTreeTransformer
@@ -45,55 +46,56 @@ if __name__ == "__main__":
         parser = Parser(input_file, reuse)
         process = parser.parse_process()
 
-        main = process.main
+        if False:
+            main = process.main
 
-        if len(main.statement.statements) == 1 and isinstance(main.statement.statements[0], compiler.parse_tree.Return):
-            returnStatement = main.statement.statements[0]
+            if len(main.statement.statements) == 1 and isinstance(main.statement.statements[0], compiler.parse_tree.Return):
+                returnStatement = main.statement.statements[0]
 
-            if not isinstance(returnStatement.expression, compiler.parse_tree.Binary):
-                print "no match"
+                if not isinstance(returnStatement.expression, compiler.parse_tree.Binary):
+                    print "no match"
 
+                    raise Exception
+
+                matchesRules = TreeMatcher.doesMatchSimpleBinaryOperations(returnStatement.expression)
+
+                if not matchesRules:
+                    print "doesn't match simple binary operations!"
+
+                    raise Exception
+
+                treeTransformer = LimitedTreeTransformer()
+                validateResult = treeTransformer.validate(returnStatement.expression)
+
+                if not validateResult:
+                    print "doesn't match implemeneted operations!"
+
+                    raise Exception
+
+                decoratedDagElementFactory = DecoratedDagElementFactory()
+
+                topDagElementIndex = treeTransformer.transform(returnStatement.expression, decoratedDagElementFactory)
+
+                flowchartForDag = FlowChart()
+
+                flowchartForDag.calcFlowChart(treeTransformer.getDag())
+
+
+
+                print matchesRules
+
+                a = 0
+
+                #if isinstance(returnStatment.expression, compiler.parse_tree.Binary):
+                #    if returnStatment.expression.operator == "+":
+
+                #    else:
+                #        unimplemented
+                #else:
+                #    unimplemented
+            else:
+                # unimplemented
                 raise Exception
-
-            matchesRules = TreeMatcher.doesMatchSimpleBinaryOperations(returnStatement.expression)
-
-            if not matchesRules:
-                print "doesn't match simple binary operations!"
-
-                raise Exception
-
-            treeTransformer = LimitedTreeTransformer()
-            validateResult = treeTransformer.validate(returnStatement.expression)
-
-            if not validateResult:
-                print "doesn't match implemeneted operations!"
-
-                raise Exception
-
-            decoratedDagElementFactory = DecoratedDagElementFactory()
-
-            topDagElementIndex = treeTransformer.transform(returnStatement.expression, decoratedDagElementFactory)
-
-            flowchartForDag = FlowChart()
-
-            flowchartForDag.calcFlowChart(treeTransformer.getDag())
-
-
-
-            print matchesRules
-
-            a = 0
-
-            #if isinstance(returnStatment.expression, compiler.parse_tree.Binary):
-            #    if returnStatment.expression.operator == "+":
-
-            #    else:
-            #        unimplemented
-            #else:
-            #    unimplemented
-        else:
-            # unimplemented
-            raise Exception
 
         name = process.main.name
         instructions = process.generate()
@@ -103,8 +105,10 @@ if __name__ == "__main__":
             frames = parallelise(instructions)
         output_file = name + ".v"
         output_file = open(output_file, "w")
-        generate_CHIP(input_file, name, frames, output_file, parser.allocator.all_registers,
-                      parser.allocator.memory_size)
+
+        backend = VhdlBackend()
+        backend.generate(input_file, name, frames, output_file, parser.allocator.all_registers, parser.allocator.memory_size)
+
         output_file.close()
     except C2CHIPError as err:
         print "Error in file:", err.filename, "at line:", err.lineno
