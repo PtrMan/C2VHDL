@@ -5,6 +5,9 @@ def unique(l):
     return dict(zip(l, l)).keys()
 
 
+from SignalDefinition import SignalDefinition
+from RegisterDefinition import RegisterDefinition
+
 # TODO< differencite between the signed and unsigned datatypes >
 
 class VhdlBackend(object):
@@ -66,31 +69,37 @@ class VhdlBackend(object):
         divisionWires = []
     
         divisionParameters = []
+
+        # TODO< choose either the bit encoding (fast in hardware) or the usual slow method >
+        # TODO< for the slow method we need to calculate the number of bits we need for it >
+        widthOfProgramCounter = len(frames)
     
         #create list of signals
-        signals = [
+        signals = [ SignalDefinition("programCounter", RegisterDefinition.EnumType.BITVECTOR, widthOfProgramCounter) ]
 
-                      ("program_counter", len(frames)),
+        registerNumber = 0
+        for register in registers:
+            signals.append(SignalDefinition("register_%s" % (registerNumber,), register.type, register.width))
 
-                      ] + [
-                      ("register_%s"%(register), 16) for register in registers
-                  ] + [
-                      ("s_output_" + i + "_stb", 16) for i in outputs
-                  ] + [
-                      ("s_output_" + i, 16) for i in outputs
-                  ] + [
-                      ("s_input_" + i + "_ack", 16) for i in inputs
-                  ] + divisionSignals
+            registerNumber += 1
+
+        #[
+        #              ("s_output_" + i + "_stb", 16) for i in outputs
+        #          ] + [
+        #              ("s_output_" + i, 16) for i in outputs
+        #          ] + [
+        #              ("s_input_" + i + "_ack", 16) for i in inputs
+        #          ] + divisionSignals
     
         parameters = divisionParameters
         wires = divisionWires
     
-        if testbench:
+        if False:# testbench:
             signals.append(("clk", 1))
             signals.append(("rst", 1))
         else:
-            inports.append(("clk", 1))
-            inports.append(("rst", 1))
+            inports.append(SignalDefinition("clk", RegisterDefinition.EnumType.LOGIC, 1))
+            inports.append(SignalDefinition("reset", RegisterDefinition.EnumType.LOGIC, 1))
     
         # output the code in VHDL
         self._writeIntro(name, input_file, inputs, outputs)
@@ -139,32 +148,46 @@ class VhdlBackend(object):
         self.outputFile.write("  -- allow. Further concurrency can be achieved by executing multiple C\n")
         self.outputFile.write("  -- processes concurrently within the device.\n")
 
-        self._writeFsmIntro()
+        self._writeFsmIntro(widthOfProgramCounter)
 
         # a frame is executed in each state
         for location, frame in enumerate(frames):
-            self._writePreFrame(location)
-            self._writeInstructionsForFrame(frame)
+            self._writePreFrame(location, widthOfProgramCounter)
+            self._writeInstructionsForFrame(frame, registers, widthOfProgramCounter)
             self._writePostFrame()
 
         self._writeFsmOutro()
 
         self._endModule()
     
-    def _writeDeclaration(self, objectType, name, size, value=None):
-        initialisation = "0" * size
+    def _writeDeclaration(self, signalDefinition):
 
-        self.outputFile.write("  signal %s: std_logic_vector(%s downto 0) := \"%s\";\n" % (name, size-1, initialisation))
+        if signalDefinition.type == RegisterDefinition.EnumType.BITVECTOR:
+            initialisation = "0" * signalDefinition.width
+
+            self.outputFile.write("  signal %s: std_logic_vector(%s downto 0) := \"%s\";\n" % (signalDefinition.name, signalDefinition.width-1, initialisation))
+
+        elif signalDefinition.type == RegisterDefinition.EnumType.LOGIC:
+            self.outputFile.write("  signal %s: std_logic := '0';\n" % (signalDefinition.name))
+
+        elif signalDefinition.type == RegisterDefinition.EnumType.UNSIGNED:
+            self.outputFile.write("  signal %s: unsigned(%s downto 0) := to_unsigned(%s, %s);\n" % (signalDefinition.name, signalDefinition.width-1, signalDefinition.width, 0))
+
+        elif signalDefinition.type == RegisterDefinition.EnumType.SIGNED:
+            self.outputFile.write("  signal %s: signed(%s downto 0) := to_signed(%s, %s);\n" % (signalDefinition.name, signalDefinition.width-1, signalDefinition.width, 0))
+
+        else:
+            raise Exception
 
     ## ...
     #
-    def _writeInstructionsForFrame(self, frame):
+    def _writeInstructionsForFrame(self, frame, registers, widthOfProgramCounter):
         for instruction in frame:
-            self._writeInstruction(instruction)
+            self._writeInstruction(instruction, registers, widthOfProgramCounter)
 
     ## ...
     #
-    def _writeInstruction(self, instruction):
+    def _writeInstruction(self, instruction, registers, widthOfProgramCounter):
         binary_operators = ["+", "-", "*", "/", "|", "&", "^", "<<", ">>", "<",">", ">=", "<=", "==", "!="]
 
         if instruction["op"] == "literal":
@@ -176,7 +199,7 @@ class VhdlBackend(object):
         elif instruction["op"] in binary_operators and "left" in instruction:
             self._writeInstructionBinaryOperationLeft(instruction)
         elif instruction["op"] in binary_operators and "right" in instruction:
-            self._writeInstructionBinaryOperationRight(instruction)
+            self._writeInstructionBinaryOperationRight(instruction, registers)
         elif instruction["op"] in binary_operators:
             self._writeInstructionBinaryOperationGeneral(instruction)
         elif instruction["op"] == "jmp_if_false":
@@ -184,11 +207,11 @@ class VhdlBackend(object):
         elif instruction["op"] == "jmp_if_true":
             self._writeInstructionJumpIfTrue(instruction)
         elif instruction["op"] == "jmp_and_link":
-            self._writeInstructionJumpAndLink(instruction)
+            self._writeInstructionJumpAndLink(instruction, registers, widthOfProgramCounter)
         elif instruction["op"] == "jmp_to_reg":
             self._writeInstructionJumpToReg(instruction)
         elif instruction["op"] == "goto":
-            self._writeInstructionGoto(instruction)
+            self._writeInstructionGoto(instruction, widthOfProgramCounter)
         elif instruction["op"] == "read":
             self._writeInstructionRead(instruction)
         elif instruction["op"] == "ready":
@@ -222,6 +245,8 @@ class VhdlBackend(object):
         )
 
     def _writeInstructionMove(self, instruction):
+        # TODO< check for conversion and do conversion >
+
         self.outputFile.write(
             "        register_%s <= register_%s;\n"%(
             instruction["dest"],
@@ -257,12 +282,56 @@ class VhdlBackend(object):
             instruction["srcb"])
         )
 
-    def _writeInstructionBinaryOperationRight(self, instruction):
+    def _writeInstructionBinaryOperationRight(self, instruction, registers):
+        # TODO< we do this for unsigned, but for signed it is different >
+
+        sourceRegister = instruction["src"]
+        destinationRegister = instruction["dest"]
+
+        numberOfBits = instruction["right"]
+        destinationWidth = registers[ instruction["dest"] ].width
+
+        operationString = ""
+
+        if instruction["op"] == "<<":
+            operationString += "register_{0} <= ".format(instruction["dest"])
+
+            operationString += "register_{0}({1} downto {2})".format(sourceRegister, destinationWidth-1-numberOfBits, 0)
+
+            operationString += " & "
+
+            if numberOfBits > 1:
+                operationString += "\"" + "0"*numberOfBits + "\""
+            else:
+                operationString += "'0'"
+
+            operationString += ";"
+
+        elif instruction["op"] == ">>":
+            operationString += "register_{0} <= ".format(instruction["dest"])
+
+            if numberOfBits > 1:
+                operationString += "\"" + "0"*numberOfBits + "\""
+            else:
+                operationString += "'0'"
+
+            operationString += " & "
+
+            operationString += "register_{0}({1} downto {2})".format(sourceRegister, destinationWidth-1-numberOfBits, 0)
+
+            operationString += ";"
+        else:
+            raise NotImplementedError
+
+        self.outputFile.write("        {0}\n".format(operationString))
+
+        return
         self.outputFile.write(
-            "        register_%s <= std_logic_vector(unsigned(register_%s) %s unsigned(%s));\n"%(
+        #    "        register_%s <= std_logic_vector(unsigned(register_%s) %s unsigned(%s));\n"%(
+            "        register_%s <= std_logic_vector(register_%s) %s %s;\n"%(
             instruction["dest"],
             instruction["src"],
-            instruction["op"],
+            operationString,
             instruction["right"] & 0xffff)
         )
         return
@@ -279,7 +348,7 @@ class VhdlBackend(object):
 
     def _writeInstructionBinaryOperationGeneral(self, instruction):
         self.outputFile.write(
-            "        register_%s <= std_logic_vector(unsigned(register_%s) %s unsigned(register_%s));\n"%(
+            "        register_%s <= register_%s %s register_%s;\n"%(
             instruction["dest"],
             instruction["src"],
             instruction["op"],
@@ -308,10 +377,19 @@ class VhdlBackend(object):
         self.outputFile.write("        if (register_%s != 16'h0000)\n"%(instruction["src"]));
         self.outputFile.write("          program_counter <= 16'd%s;\n"%(instruction["label"]&0xffff))
 
-    def _writeInstructionJumpAndLink(self, instruction):
-        self.outputFile.write("        program_counter <= %s;\n" % (instruction["label"]&0xffff))
-        self.outputFile.write("        register_%s <= %s;\n" % (
-            instruction["dest"], (self.location+1)&0xffff))
+    def _writeInstructionJumpAndLink(self, instruction, registers, widthOfProgramCounter):
+        # TODO< build in the type of the link register >
+
+        linkRegister = instruction["dest"]
+        widthOfLinkRegister = registers[linkRegister].width
+
+        self.outputFile.write("        programCounter <= std_logic_vector( to_unsigned({0}, {1}) );\n".format(instruction["label"] & 0xffff, widthOfProgramCounter))
+        self.outputFile.write(
+            "        register_{0} <= to_signed({1}, {2});\n".format(
+                linkRegister,
+                (self.location+1)&0xffff,
+                widthOfLinkRegister)
+        )
 
         return
         # old orginal verilog code
@@ -321,15 +399,17 @@ class VhdlBackend(object):
     )
 
     def _writeInstructionJumpToReg(self, instruction):
-        self.outputFile.write("        program_counter <= register_%s;\n"%instruction["src"])
+        # TODO< convert between the register width >
+
+        self.outputFile.write("        programCounter <= std_logic_vector( register_{0} );\n".format(instruction["src"]))
 
         return
 
         # old orginal verilog code
         self.outputFile.write("        program_counter <= register_%s;\n"%instruction["src"])
 
-    def _writeInstructionGoto(self, instruction):
-        self.outputFile.write("        program_counter <= %s;\n" % (instruction["label"]&0xffff))
+    def _writeInstructionGoto(self, instruction, widthOfProgramCounter):
+        self.outputFile.write("        programCounter <= std_logic_vector( to_unsigned({0}, {1}) );\n".format(instruction["label"]&0xffff, widthOfProgramCounter))
 
         return
 
@@ -340,14 +420,14 @@ class VhdlBackend(object):
         self.outputFile.write("        register_%s <= input_%s;\n"%(
             instruction["dest"], instruction["input"])
         )
-        self.outputFile.write("        program_counter <= %s;\n"%self.location)
+        self.outputFile.write("        programCounter <= %s;\n"%self.location)
         self.outputFile.write("        s_input_%s_ack <= 1'b1;\n"%instruction["input"])
         self.outputFile.write( "       if (s_input_%s_ack == 1'b1 && input_%s_stb == 1'b1) then\n"%(
             instruction["input"],
             instruction["input"])
         )
         self.outputFile.write("          s_input_%s_ack <= 1'b0;\n"%instruction["input"])
-        self.outputFile.write("          program_counter <= %s;\n"%(self.location+1))
+        self.outputFile.write("          programCounter <= %s;\n"%(self.location+1))
         self.outputFile.write("        end;\n")
 
         return
@@ -378,7 +458,7 @@ class VhdlBackend(object):
     def _writeInstructionWrite(self, instruction):
         self.outputFile.write("        s_output_%s <= register_%s;\n"%(
             instruction["output"], instruction["src"]))
-        self.outputFile.write("        program_counter <= %s;\n"%self.location)
+        self.outputFile.write("        programCounter <= %s;\n"%self.location)
         self.outputFile.write("        s_output_%s_stb <= 1'b1;\n"%instruction["output"])
         self.outputFile.write(
             "        if (s_output_%s_stb == 1'b1 && output_%s_ack == 1'b1) begin\n"%(
@@ -386,7 +466,7 @@ class VhdlBackend(object):
             instruction["output"]
         ))
         self.outputFile.write("          s_output_%s_stb <= 1'b0;\n"%instruction["output"])
-        self.outputFile.write("          program_counter <= %s;\n"%(self.location+1))
+        self.outputFile.write("          programCounter <= %s;\n"%(self.location+1))
         self.outputFile.write("        end\n")
 
         return
@@ -465,13 +545,13 @@ class VhdlBackend(object):
         )
 
     def _writeInstructionStop(self, instruction):
-        self.outputFile.write("        program_counter <= program_counter;\n")
+        self.outputFile.write("        programCounter <= programCounter;\n")
 
         return
         # old orginal verilog code
 
         self.outputFile.write('        $finish;\n')
-        self.outputFile.write("        program_counter <= program_counter;\n")
+        self.outputFile.write("        programCounter <= programCounter;\n")
 
     def _writeIntro(self, name, input_file, inputs, outputs):
         self.outputFile.write("-- name : %s\n"%name)
@@ -484,10 +564,10 @@ class VhdlBackend(object):
         self.outputFile.write("-- %s\n"%name.title())
         self.outputFile.write("-- %s\n"%"".join(["=" for i in name]))
         self.outputFile.write("-- \n")
-        self.outputFile.write("-- *Created by C2VHDL*\n\n")
+        self.outputFile.write("-- *Created by C2VHDL*\n")
         self.outputFile.write("\n")
 
-        self.outputFile.write("library ieee\n")
+        self.outputFile.write("library ieee;\n")
         self.outputFile.write("use ieee.numeric_std.all;\n")
         self.outputFile.write("use ieee.std_logic_1164.all;\n")
         self.outputFile.write("\n")
@@ -495,34 +575,40 @@ class VhdlBackend(object):
     def _beginModule(self, inports, outports, signals):
         tempString = ""
 
+        numberOfArguments = len(inports) + len(outports)
+        argumentCounter = 0
+
         for inport in inports:
-            (name, size) = inport
+            lastArgument = numberOfArguments - 1 <= argumentCounter
 
-            if size > 1:
-                tempString += "%s: in std_logic" % (name,)
+            if inport.type == RegisterDefinition.EnumType.LOGIC:
+                tempString += "%s: in std_logic" % (inport.name,)
+            elif inport.type == RegisterDefinition.EnumType.BITVECTOR:
+                tempString += "%s: in std_logic_vector(%s downto 0)" % (inport.width-1, inport.name)
             else:
-                tempString += "%s: in std_logic_vector(15 downto 0)" % (name,)
+                raise NotImplementedError
 
-            tempString += ";\n"
-
-        length = len(outports)
-        i = 0
-        for outport in outports:
-            lastOutport = length - 1 <= i
-
-            (name, size) = outport
-
-            if size > 1:
-                tempString += "%s: out std_logic" % (name,)
-            else:
-                tempString += "%s: out std_logic_vector(15 downto 0)" % (name,)
-
-            if not lastOutport:
+            if not lastArgument:
                 tempString += ";"
 
             tempString += "\n"
 
-            i += 1
+            argumentCounter += 1
+
+        for outport in outports:
+            lastArgument = numberOfArguments - 1 <= argumentCounter
+
+            if outport.size > 1:
+                tempString += "%s: out std_logic" % (outport.name,)
+            else:
+                tempString += "%s: out std_logic_vector(%s downto 0)" % (outport.size-1, outport.name)
+
+            if not lastArgument:
+                tempString += ";"
+
+            tempString += "\n"
+
+            argumentCounter += 1
 
         self.outputFile.write("entity %s is\n" % ("Generated",))
         self.outputFile.write("port(\n")
@@ -535,16 +621,16 @@ class VhdlBackend(object):
         self.outputFile.write("architecture arch0 of %s is\n" % ("Generated",))
 
 
-        for name, size in signals:
-            self._writeDeclaration("  reg       ", name, size)
+        for signal in signals:
+            self._writeDeclaration(signal)
 
 
         self.outputFile.write("begin\n")
 
     def _endModule(self):
-        self.outputFile.write("end %s;\n" % ("Generated"))
+        self.outputFile.write("end %s;\n" % ("arch0"))
 
-    def _writeFsmIntro(self):
+    def _writeFsmIntro(self, widthOfProgramCounter):
         sensitivityList = []
 
         sensitivityList.append("clk")
@@ -556,11 +642,11 @@ class VhdlBackend(object):
         self.outputFile.write("  begin\n")
         self.outputFile.write("  if rising_edge(clk) then\n")
 
-        self.outputFile.write("    program_counter <= program_counter + 1;\n")
+        self.outputFile.write("    programCounter <= std_logic_vector( unsigned(programCounter) + to_unsigned(1, {0}) );\n".format(widthOfProgramCounter))
 
         self.outputFile.write("\n")
 
-        self.outputFile.write("    case programCounter is")
+        self.outputFile.write("    case programCounter is\n")
 
 
         return
@@ -572,14 +658,16 @@ class VhdlBackend(object):
         self.outputFile.write("    end\n\n")
         self.outputFile.write("    data_out <= memory[address];\n")
         self.outputFile.write("    write_enable <= 1'b0;\n")
-        self.outputFile.write("    program_counter <= program_counter + 1;\n")
+        self.outputFile.write("    programCounter <= programCounter + 1;\n")
         self.outputFile.write("    timer <= 16'h0000;\n\n")
-        self.outputFile.write("    case(program_counter)\n\n")
+        self.outputFile.write("    case(programCounter)\n\n")
 
     def _writeFsmOutro(self):
+        self.outputFile.write("      when others =>\n")
+        self.outputFile.write("        programCounter <= programCounter;\n")
         self.outputFile.write("    end case;\n")
         self.outputFile.write("  end if;\n")
-        self.outputFile.write("end process0;\n")
+        self.outputFile.write("end process process0;\n")
 
     def _writeInports(self, inports):
         # do nothing for vhdl
@@ -597,8 +685,10 @@ class VhdlBackend(object):
         for name, size in outports:
             self._writeDeclaration("  output    ", name, size)
 
-    def _writePreFrame(self, location):
-        self.outputFile.write("      when %s =>\n" % (location,))
+    def _writePreFrame(self, location, programCounterWidth):
+        binaryEncoding = bin(location)[2:].rjust(programCounterWidth, "0")
+
+        self.outputFile.write("      when \"%s\" =>\n" % (binaryEncoding,))
 
     def _writePostFrame(self):
         pass

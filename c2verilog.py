@@ -21,8 +21,8 @@ from LimitedTreeTransformer import LimitedTreeTransformer
 from FlowChart import *
 from DecoratedDagElementFactory import *
 
-#Command Line Application
-####################################################################################################
+from RegisterDefinition import RegisterDefinition
+
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
@@ -106,8 +106,15 @@ if __name__ == "__main__":
         output_file = name + ".v"
         output_file = open(output_file, "w")
 
+        # we translate the registers from his format to a better format
+
+        registers = []
+
+        for registerI in range(0, len(parser.allocator.all_registers)):
+            registers.append(RegisterDefinition(RegisterDefinition.EnumType.SIGNED, 16))
+
         backend = VhdlBackend()
-        backend.generate(input_file, name, frames, output_file, parser.allocator.all_registers, parser.allocator.memory_size)
+        backend.generate(input_file, name, frames, output_file, registers, parser.allocator.memory_size)
 
         output_file.close()
     except C2CHIPError as err:
