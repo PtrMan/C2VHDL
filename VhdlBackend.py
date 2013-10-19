@@ -22,8 +22,8 @@ class VhdlBackend(object):
 
     ## A big ugly function to crunch through all the instructions and generate the CHIP equivilent
     #
-    def generate(self, input_file, name, frames, outputFile, registers, memorySize):
-        self.outputFile = outputFile
+    def generate(self, input_file, name, frames, outputFilename, registers, memorySize):
+        self.outputFile = open(outputFilename + ".vhd", "w")
 
         # calculate the values of jump locations
         self.location = 0
@@ -170,6 +170,8 @@ class VhdlBackend(object):
         self._writeNextstateLogic()
 
         self._endModule()
+
+        self.outputFile.close()
     
     def _writeDeclaration(self, signalDefinition):
 
@@ -184,12 +186,12 @@ class VhdlBackend(object):
             self._writeLine("signal next{0}: std_logic := '0';".format(signalDefinition.name))
 
         elif signalDefinition.type == RegisterDefinition.EnumType.UNSIGNED:
-            self._writeLine("signal %s: unsigned(%s downto 0) := to_unsigned(%s, %s);" % (signalDefinition.name, signalDefinition.width-1, signalDefinition.width, 0), 1)
-            self._writeLine("signal next%s: unsigned(%s downto 0) := to_unsigned(%s, %s);" % (signalDefinition.name, signalDefinition.width-1, signalDefinition.width, 0), 1)
+            self._writeLine("signal %s: unsigned(%s downto 0) := to_unsigned(%s, %s);" % (signalDefinition.name, signalDefinition.width-1, 0, signalDefinition.width), 1)
+            self._writeLine("signal next%s: unsigned(%s downto 0) := to_unsigned(%s, %s);" % (signalDefinition.name, signalDefinition.width-1, 0, signalDefinition.width), 1)
 
         elif signalDefinition.type == RegisterDefinition.EnumType.SIGNED:
-            self._writeLine("signal {0}: signed({1} downto 0) := to_signed({2}, {3});".format(signalDefinition.name, signalDefinition.width-1, signalDefinition.width, 0), 1)
-            self._writeLine("signal next{0}: signed({1} downto 0) := to_signed({2}, {3});".format(signalDefinition.name, signalDefinition.width-1, signalDefinition.width, 0), 1)
+            self._writeLine("signal {0}: signed({1} downto 0) := to_signed({2}, {3});".format(signalDefinition.name, signalDefinition.width-1, 0, signalDefinition.width), 1)
+            self._writeLine("signal next{0}: signed({1} downto 0) := to_signed({2}, {3});".format(signalDefinition.name, signalDefinition.width-1, 0, signalDefinition.width), 1)
 
         else:
             raise Exception
@@ -206,7 +208,7 @@ class VhdlBackend(object):
         binary_operators = ["+", "-", "*", "/", "|", "&", "^", "<<", ">>", "<",">", ">=", "<=", "==", "!="]
 
         if instruction["op"] == "literal":
-            self._writeInstructionLiteral(instruction)
+            self._writeInstructionLiteral(instruction, registers)
         elif instruction["op"] == "move":
             self._writeInstructionMove(instruction)
         elif instruction["op"] in ["~"]:
@@ -224,7 +226,7 @@ class VhdlBackend(object):
         elif instruction["op"] == "jmp_and_link":
             self._writeInstructionJumpAndLink(instruction, registers, widthOfProgramCounter)
         elif instruction["op"] == "jmp_to_reg":
-            self._writeInstructionJumpToReg(instruction)
+            self._writeInstructionJumpToReg(instruction, widthOfProgramCounter)
         elif instruction["op"] == "goto":
             self._writeInstructionGoto(instruction, widthOfProgramCounter)
         elif instruction["op"] == "read":
@@ -250,7 +252,22 @@ class VhdlBackend(object):
         else:
             raise Exception
 
-    def _writeInstructionLiteral(self, instruction):
+    def _writeInstructionLiteral(self, instruction, registers):
+        # TODO< build mask >
+        # TODO< do type dependent things >
+
+        destinationBitWidth = registers[ instruction["dest"] ].width
+
+        operationString = "nextregister_{0} <= to_signed({1}, {2});".format(
+            instruction["dest"],
+            instruction["literal"]&0xffff,
+            destinationBitWidth
+        )
+        self._writeLine(operationString, 4)
+
+        self.wroteToRegister[ instruction["dest"] ] = True
+        return
+
         raise NotImplementedError
         # old orginal verilog code
         self.outputFile.write(
@@ -422,10 +439,10 @@ class VhdlBackend(object):
             instruction["dest"], (self.location+1)&0xffff)
     )
 
-    def _writeInstructionJumpToReg(self, instruction):
+    def _writeInstructionJumpToReg(self, instruction, widthOfProgramCounter):
         # TODO< convert between the register width >
 
-        operationString = "nextprogramCounter <= std_logic_vector( register_{0} );".format(instruction["src"])
+        operationString = "nextprogramCounter <= std_logic_vector( register_{0}({1} downto 0) );".format(instruction["src"], widthOfProgramCounter-1)
         self._writeLine(operationString, 4)
 
         self.wroteProgramCounter = True
@@ -566,7 +583,15 @@ class VhdlBackend(object):
         self.outputFile.write("        end\n")
 
     def _writeInstructionReport(self, instruction):
-        raise NotImplementedError
+        operationString = "assert false report \"(report at line: {0} in file: {1}) \" & integer'image(to_integer(register_{2})) severity note;".format(
+            instruction["line"],
+            instruction["file"],
+            instruction["src"]
+        )
+        self._writeLine(operationString, 4)
+
+        return
+
         # old orginal verilog code
 
         self.outputFile.write(

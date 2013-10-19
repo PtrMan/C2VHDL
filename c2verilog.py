@@ -103,8 +103,6 @@ if __name__ == "__main__":
             frames = [[i] for i in instructions]
         else:
             frames = parallelise(instructions)
-        output_file = name + ".v"
-        output_file = open(output_file, "w")
 
         # we translate the registers from his format to a better format
 
@@ -114,9 +112,8 @@ if __name__ == "__main__":
             registers.append(RegisterDefinition(RegisterDefinition.EnumType.SIGNED, 16))
 
         backend = VhdlBackend()
-        backend.generate(input_file, name, frames, output_file, registers, parser.allocator.memory_size)
 
-        output_file.close()
+        backend.generate(input_file, name, frames, name, registers, parser.allocator.memory_size)
     except C2CHIPError as err:
         print "Error in file:", err.filename, "at line:", err.lineno
         print err.message
