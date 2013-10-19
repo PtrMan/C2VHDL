@@ -76,6 +76,7 @@ class Parser:
         function.statement = self.parse_statement()
         if type_ != "void" and not hasattr(function, "return_statement"):
             self.tokens.error("Function must have a return statement")
+
         self.function = None
         self.scope = stored_scope
         self.scope[function.name] = function
@@ -143,7 +144,7 @@ class Parser:
         return wait_clocks
 
     def parse_statement(self):
-        if self.tokens.peek() in ["int", "short", "long", "char"] + self.structs:
+        if self.tokens.peek() in ["int", "short", "long", "char", "bool"] + self.structs:
             return self.parse_compound_declaration()
         elif self.tokens.peek() == "struct":
             return self.parse_struct_declaration()
@@ -358,7 +359,7 @@ class Parser:
         while self.tokens.peek() != "}":
             type_ = self.tokens.get()
             name = self.tokens.get()
-            members[name] = self.parse_declaration(type_, name)
+            members[name] = self.parseVariableDeclaration(type_, name)
             self.tokens.expect(";")
         self.tokens.expect("}")
         return members
@@ -391,7 +392,7 @@ class Parser:
     def parse_global_declaration(self, type_, name):
         instances = []
         while True:
-            instance = self.parse_declaration(type_, name).instance()
+            instance = self.parseVariableDeclaration(type_, name).instance()
             self.scope[name] = instance
             instances.append(instance)
             if self.tokens.peek() == ",":
@@ -407,7 +408,7 @@ class Parser:
         instances = []
         while True:
             name = self.tokens.get()
-            instance = self.parse_declaration(type_, name).instance()
+            instance = self.parseVariableDeclaration(type_, name).instance()
             self.scope[name] = instance
             instances.append(instance)
             if self.tokens.peek() == ",":
@@ -418,11 +419,11 @@ class Parser:
         self.tokens.expect(";")
         return CompoundDeclaration(instances)
 
-    def parse_declaration(self, type_, name):
+    def parseVariableDeclaration(self, type_, name):
         #struct declaration
         if type_ in self.structs:
             declaration = self.scope[type_]
-        elif type_ in ["int", "short", "long", "char"]:
+        elif type_ in ["int", "short", "long", "char", "bool"]:
             #array declaration 
             if self.tokens.peek() == "[":
                 self.tokens.expect("[")
@@ -444,6 +445,9 @@ class Parser:
                     name,
                     type_
                 )
+
+        # TODO< system C compatible types >
+        # TODO< ac_int >
 
         return declaration
 
@@ -533,7 +537,11 @@ class Parser:
         return expression
 
     def parse_number_or_variable(self):
-        if self.tokens.peek()[0].isalpha():
+        firstToken = self.tokens.peek()
+
+        if firstToken == "true" or firstToken == "false":
+            return self.parseBoolean()
+        elif firstToken[0].isalpha():
             name = self.tokens.get()
             if self.tokens.peek() == "(":
                 return self.parse_function_call(name)
@@ -617,6 +625,16 @@ class Parser:
             except SyntaxError:
                 self.tokens.error("%s is not an integer literal"%token)
         return Constant(value)
+
+    def parseBoolean(self):
+        token = self.tokens.get()
+
+        if token == "true":
+            return Boolean(True)
+        elif token == "false":
+            return Boolean(False)
+        else:
+            raise Exception
 
     def parse_variable(self, name):
         if name not in self.scope:

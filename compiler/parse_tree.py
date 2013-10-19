@@ -8,7 +8,7 @@ class NotConstant(Exception):
 ## If an expression can be evaluated at compile time, return the value
 #
 def value(expression):
-    if hasattr(expression, "value"):
+    if expression.isConstantFoldable():
         return truncate(expression.value())
     else:
         raise NotConstant
@@ -31,7 +31,7 @@ def truncate(number):
     return number
 
 
-class Process:
+class Process(object):
     def generate(self):
         instructions = []
         for function in self.functions:
@@ -51,7 +51,7 @@ class Process:
 
         return instructions
 
-class Function:
+class Function(object):
     def __init__(self, allocator):
         self.allocator = allocator
         self.name = ""
@@ -70,10 +70,10 @@ class Function:
 
         return instructions
 
-class Break:
+class Break(object):
     def generate(self): return [{"op":"goto", "label":"break_%s"%id(self.loop)}]
 
-class Continue:
+class Continue(object):
     def generate(self): return [{"op":"goto", "label":"continue_%s"%id(self.loop)}]
 
 class Assert(object):
@@ -95,7 +95,7 @@ class Return(object):
         instructions.append({"op":"jmp_to_reg", "src":self.function.return_address})
         return instructions
 
-class Report:
+class Report(object):
     def generate(self):
         result = self.allocator.new()
         instructions = self.expression.generate(result)
@@ -104,7 +104,7 @@ class Report:
 
         return instructions
 
-class WaitClocks:
+class WaitClocks(object):
     def generate(self):
         result = self.allocator.new()
         instructions = self.expression.generate(result)
@@ -112,7 +112,7 @@ class WaitClocks:
         instructions.append({"op":"wait_clocks", "src":result})
         return instructions
 
-class If:
+class If(object):
     def generate(self):
         try:
             if   value(self.expression):
@@ -141,7 +141,7 @@ class If:
             instructions.append({"op":"label", "label":"end_%s"%id(self)})
             return instructions
 
-class Switch:
+class Switch(object):
     def generate(self):
         result = self.allocator.new()
         test = self.allocator.new()
@@ -162,15 +162,15 @@ class Switch:
 
         return instructions
 
-class Case:
+class Case(object):
     def generate(self):
         return [{"op":"label", "label":"case_%s"%id(self)}]
 
-class Default:
+class Default(object):
     def generate(self):
         return [{"op":"label", "label":"case_%s"%id(self)}]
 
-class Loop:
+class Loop(object):
     def generate(self):
         instructions = [{"op":"label", "label":"begin_%s"%id(self)}]
         instructions.append({"op":"label", "label":"continue_%s"%id(self)})
@@ -180,7 +180,7 @@ class Loop:
 
         return instructions
 
-class For:
+class For(object):
     def generate(self):
         instructions = []
         if hasattr(self, "statement1"):
@@ -200,14 +200,14 @@ class For:
         instructions.append({"op":"label", "label":"break_%s"%id(self)})
         return instructions
 
-class Block:
+class Block(object):
     def generate(self):
         instructions = []
         for statement in self.statements:
             instructions.extend(statement.generate())
         return instructions
 
-class CompoundDeclaration:
+class CompoundDeclaration(object):
     def __init__(self, declarations):
         self.declarations = declarations
 
@@ -217,7 +217,7 @@ class CompoundDeclaration:
             instructions.extend(declaration.generate());
         return instructions
 
-class VariableDeclaration:
+class VariableDeclaration(object):
     def __init__(self, allocator, initializer, name, type_):
         self.initializer = initializer
         self.allocator = allocator
@@ -227,15 +227,16 @@ class VariableDeclaration:
         register = self.allocator.new("variable "+self.name)
         return VariableInstance(register, self.initializer, self.type_)
 
-class VariableInstance:
+class VariableInstance(object):
     def __init__(self, register, initializer, type_):
         self.register = register
         self.type_ = type_
         self.initializer = initializer
+
     def generate(self):
         return self.initializer.generate(self.register)
 
-class ArrayDeclaration:
+class ArrayDeclaration(object):
     def __init__(self, allocator, size, type_):
         self.allocator = allocator
         self.size = size
@@ -245,16 +246,17 @@ class ArrayDeclaration:
         register = self.allocator.new("array")
         return ArrayInstance(location, register, self.size, self.type_)
 
-class ArrayInstance:
+class ArrayInstance(object):
     def __init__(self, location, register, size, type_):
         self.register = register
         self.location = location
         self.size = size
         self.type_ = type_
+
     def generate(self):
         return [{"op":"literal", "literal":self.location, "dest":self.register}]
 
-class StructDeclaration:
+class StructDeclaration(object):
     def __init__(self, members):
         self.members = members
 
@@ -264,7 +266,7 @@ class StructDeclaration:
             instances[name] = declaration.instance()
         return StructInstance(instances)
 
-class StructInstance:
+class StructInstance(object):
     def __init__(self, members):
         self.members = members
         self.type_ = "struct"
@@ -275,14 +277,14 @@ class StructInstance:
             instructions.extend(member.generate())
         return instructions
 
-class Argument:
+class Argument(object):
     def __init__(self, name, type_, parser):
         self.type_=type_
         parser.scope[name] = self
         self.register = parser.allocator.new("function argument "+name)
     def generate(self): return []
 
-class DiscardExpression:
+class DiscardExpression(object):
     def __init__(self, expression, allocator):
         self.expression = expression
         self.allocator = allocator
@@ -307,7 +309,7 @@ def AND(left, right):
 def OR(left, right):
     return ANDOR(left, right, "jmp_if_true")
 
-class ANDOR:
+class ANDOR(object):
     def __init__(self, left, right, op):
         self.left = constant_fold(left)
         self.right = constant_fold(right)
@@ -327,7 +329,7 @@ class ANDOR:
         else:
             return value(self.left) or value(self.right)
 
-class Binary:
+class Binary(object):
     def __init__(self, operator, left, right, allocator):
         self.left = constant_fold(left)
         self.right = constant_fold(right)
@@ -361,7 +363,7 @@ class Binary:
     def value(self):
         return eval("%s %s %s"%(value(self.left), self.operator, value(self.right)))
 
-class Unary:
+class Unary(object):
     def __init__(self, operator, expression):
         self.expression = constant_fold(expression)
         self.operator = operator
@@ -375,7 +377,7 @@ class Unary:
     def value(self):
         return eval("%s%s"%(self.operator, value(self.expression)))
 
-class FunctionCall:
+class FunctionCall(object):
     def generate(self, result):
         instructions = []
 
@@ -393,7 +395,7 @@ class FunctionCall:
 
         return instructions
 
-class Output:
+class Output(object):
     def __init__(self, name, expression):
         self.name = name
         self.expression = expression
@@ -405,7 +407,7 @@ class Output:
 
         return instructions
 
-class Input:
+class Input(object):
     def __init__(self, name):
         self.name = name
         self.type_ = "int"
@@ -413,7 +415,7 @@ class Input:
     def generate(self, result):
         return [{"op"   :"read", "dest" :result, "input":self.name}]
 
-class Ready:
+class Ready(object):
     def __init__(self, name):
         self.name = name
         self.type_ = "int"
@@ -421,7 +423,7 @@ class Ready:
     def generate(self, result):
         return [{"op"   :"ready", "dest" :result, "input":self.name}]
 
-class Array:
+class Array(object):
     def __init__(self, declaration, allocator):
         self.declaration = declaration
         self.allocator = allocator
@@ -437,7 +439,7 @@ class Array:
 
         return instructions
 
-class ArrayIndex:
+class ArrayIndex(object):
     def __init__(self, declaration, index_expression, allocator):
         self.declaration = declaration
         self.allocator = allocator
@@ -461,7 +463,7 @@ class ArrayIndex:
                              "dest"  :result})
         return instructions
 
-class Variable:
+class Variable(object):
     def __init__(self, declaration, allocator):
         self.declaration = declaration
         self.allocator = allocator
@@ -477,7 +479,21 @@ class Variable:
 
         return instructions
 
-class Assignment:
+    def isConstantFoldable(self):
+        return False
+
+class Boolean(object):
+    def __init__(self, value):
+        self.value = value
+
+    def generate(self, result):
+        instructions = [{"op":"literal", "dest":result, "literal":self.value}]
+        return instructions
+
+    def isConstantFoldable(self):
+        return False
+
+class Assignment(object):
     def __init__(self, lvalue, expression, allocator):
         self.lvalue = lvalue
         self.expression = expression
@@ -506,7 +522,7 @@ class Assignment:
 
         return instructions
 
-class Constant:
+class Constant(object):
     def __init__(self, value):
         self._value = value
         self.type_ = "int"
@@ -517,3 +533,6 @@ class Constant:
 
     def value(self):
         return self._value
+
+    def isConstantFoldable(self):
+        return True
