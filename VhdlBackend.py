@@ -249,7 +249,7 @@ class VhdlBackend(object):
         elif instruction["op"] == "memory_write":
             self._writeInstructionMemoryWrite(instruction)
         elif instruction["op"] == "assert":
-            self._writeInstructionAssert(instruction)
+            self._writeInstructionAssert(instruction, registers)
         elif instruction["op"] == "wait_clocks":
             self._writeInstructionWaitClocks(instruction)
         elif instruction["op"] == "report":
@@ -365,6 +365,8 @@ class VhdlBackend(object):
         operationString = ""
 
         if instruction["op"] == "<<":
+            # TODO< shift for number >
+
             operationString += "nextregister_{0} <= ".format(instruction["dest"])
 
             operationString += "register_{0}({1} downto {2})".format(sourceRegister, destinationWidth-1-numberOfBits, 0)
@@ -380,6 +382,8 @@ class VhdlBackend(object):
 
             self._writeLine(operationString, 4)
         elif instruction["op"] == ">>":
+            # TODO< shift for number >
+
             operationString += "nextregister_{0} <= ".format(instruction["dest"])
 
             if numberOfBits > 1:
@@ -394,9 +398,19 @@ class VhdlBackend(object):
             operationString += ";"
 
             self._writeLine(operationString, 4)
-        elif instruction["op"] == "<":
-            operationString = "if register_{0} < to_signed({1}, {2}) then".format(
+        elif instruction["op"] == "<" or instruction["op"] == "==":
+            instructionAsString = ""
+
+            if instruction["op"] == "<":
+                instructionAsString = "<"
+            elif instruction["op"] == "==":
+                instructionAsString = "="
+            else:
+                raise NotImplementedError
+
+            operationString = "if register_{0} {1} to_signed({2}, {3}) then".format(
                 instruction["src"],
+                instructionAsString,
                 instruction["right"],
                 destinationWidth
             )
@@ -411,7 +425,6 @@ class VhdlBackend(object):
             self._writeLine(operationString, 5)
 
             self._writeLine("end if;", 4)
-
         else:
             raise NotImplementedError
 
@@ -649,8 +662,33 @@ class VhdlBackend(object):
         self.outputFile.write("        data_in <= register_%s;\n"%(instruction["srcb"]))
         self.outputFile.write("        write_enable <= 1'b1;\n")
 
-    def _writeInstructionAssert(self, instruction):
-        raise NotImplementedError
+    def _writeInstructionAssert(self, instruction, registers):
+
+        sourceRegister = instruction["src"]
+        sourceRegisterWidth = registers[ sourceRegister ].width
+
+        compareRegister = "0" * sourceRegisterWidth
+
+        if sourceRegisterWidth == 1:
+            compareRegister = "'{0}'".format(compareRegister)
+        else:
+            compareRegister = "\"{0}\"".format(compareRegister)
+
+        operationString = "if register_{0} = {1} then".format(sourceRegister, compareRegister)
+        self._writeLine(operationString, 4)
+
+        operationString = "assert false report \"(Assertion failed at line: {0} in file: {1}) \" severity error;".format(
+            instruction["line"],
+            instruction["file"]
+        )
+        self._writeLine(operationString, 5)
+
+        # TODO< finish the process >
+
+        self._writeLine("end if;", 4)
+
+        return
+
         # old orginal verilog code
 
         self.outputFile.write( "        if (register_%s == 16'h0000) begin\n"%instruction["src"])
