@@ -445,6 +445,9 @@ class Array(object):
 
         return instructions
 
+    def isConstantFoldable(self):
+        return False
+
 class ArrayIndex(object):
     def __init__(self, declaration, index_expression, allocator):
         self.declaration = declaration
@@ -491,6 +494,7 @@ class Variable(object):
 class Boolean(object):
     def __init__(self, value):
         self.value = value
+        self.type_ = "boolean"
 
     def generate(self, result):
         instructions = [{"op":"literal", "dest":result, "literal":self.value}]

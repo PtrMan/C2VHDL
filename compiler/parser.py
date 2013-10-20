@@ -182,6 +182,9 @@ class Parser:
     def parse_discard(self):
         return DiscardExpression(self.parse_expression(), self.allocator)
 
+    ## ...
+    #
+    # does also type checking
     def parse_assignment(self):
         assignment_operators = [
             "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "<<=", ">>=", 
@@ -210,10 +213,12 @@ class Parser:
                     self.parse_ternary_expression(), 
                     self.allocator
                 )
+
             if lvalue.type_ != expression.type_:
                 self.tokens.error(
                     "type mismatch in assignment"
                 )
+
             return Assignment(lvalue, expression, self.allocator)
         else:
             return lvalue

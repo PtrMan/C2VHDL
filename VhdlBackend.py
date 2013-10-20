@@ -35,6 +35,7 @@ class VhdlBackend(object):
             else:
                 newFrames.append(frame)
                 self.location += 1
+
         frames = newFrames
     
         # substitue real values for labeled jump locations
@@ -76,7 +77,9 @@ class VhdlBackend(object):
 
         # TODO< choose either the bit encoding (fast in hardware) or the usual slow method >
         # TODO< for the slow method we need to calculate the number of bits we need for it >
-        widthOfProgramCounter = len(frames)
+        #widthOfProgramCounter = len(frames)
+
+        widthOfProgramCounter = len(bin(len(frames))[2:])
     
         #create list of signals
         signals = [ SignalDefinition("programCounter", RegisterDefinition.EnumType.BITVECTOR, widthOfProgramCounter) ]
@@ -154,10 +157,13 @@ class VhdlBackend(object):
         self.outputFile.write("  -- allow. Further concurrency can be achieved by executing multiple C\n")
         self.outputFile.write("  -- processes concurrently within the device.\n")
 
-        self._writeFsmIntro(widthOfProgramCounter)
+        self._writeFsmIntro(widthOfProgramCounter, registers)
 
         # a frame is executed in each state
+
         for location, frame in enumerate(frames):
+            self.location = location
+
             self._resetWriteFlags(len(registers))
 
             self._writePreFrame(location, widthOfProgramCounter)
@@ -165,9 +171,10 @@ class VhdlBackend(object):
             self._writeSetUnusedRegisters(widthOfProgramCounter)
             self._writePostFrame()
 
+
         self._writeFsmOutro()
 
-        self._writeNextstateLogic()
+        self._writeNextstateLogic(registers)
 
         self._endModule()
 
@@ -330,6 +337,7 @@ class VhdlBackend(object):
             sourceRegister,
             destinationRegisterWidth-1
         )
+        self._writeLine(operationString, 4)
 
         self.wroteToRegister[ destinationRegister ] = True
 
@@ -387,7 +395,11 @@ class VhdlBackend(object):
 
             self._writeLine(operationString, 4)
         elif instruction["op"] == "<":
-            operationString = "if register_{0} < register_{1} then".format(instruction["src"], instruction["right"])
+            operationString = "if register_{0} < to_signed({1}, {2}) then".format(
+                instruction["src"],
+                instruction["right"],
+                destinationWidth
+            )
             self._writeLine(operationString, 4)
 
             operationString = "nextregister_{0} <= to_signed(1, {1});".format(instruction["dest"], destinationWidth)
@@ -441,8 +453,6 @@ class VhdlBackend(object):
         )
 
     def _writeInstructionJumpIfFalse(self, instruction, registers, widthOfProgramCounter):
-        ##### TODO TODO TODO
-
         # TODO< improve masking >
 
         sourceRegister = instruction["src"]
@@ -455,7 +465,7 @@ class VhdlBackend(object):
         else:
             compareRegister = "\"{0}\"".format(compareRegister)
 
-        operationString = "if (register_{0} == {1} then".format(sourceRegister, compareRegister)
+        operationString = "if register_{0} = {1} then".format(sourceRegister, compareRegister)
         self._writeLine(operationString, 4)
 
         operationString = "nextprogramCounter <= std_logic_vector( to_unsigned({0}, {1}) );".format(
@@ -464,7 +474,12 @@ class VhdlBackend(object):
         )
         self._writeLine(operationString, 5)
         self._writeLine("else", 4)
-        self._writeLine("nextprogramCounter <= std_logic_vector( unsigned(programCounter) + to_unsigned(1, 12) );", 5)
+
+        operationString = "nextprogramCounter <= std_logic_vector( unsigned(programCounter) + to_unsigned(1, {0}) );".format(
+            widthOfProgramCounter
+        )
+        self._writeLine(operationString, 5)
+
         self._writeLine("end if;", 4)
 
         self.wroteProgramCounter = True
@@ -762,11 +777,13 @@ class VhdlBackend(object):
     def _endModule(self):
         self.outputFile.write("end %s;\n" % ("arch0"))
 
-    def _writeFsmIntro(self, widthOfProgramCounter):
+    def _writeFsmIntro(self, widthOfProgramCounter, registers):
         sensitivityList = []
 
         sensitivityList.append("programCounter")
-        # TODO< more for the sensivity list >
+
+        for i in range(len(registers)):
+            sensitivityList.append("register_{0}".format(i))
 
         self._writeLine("", 1)
         self._writeLine("process0: process({0}) is".format(",".join(sensitivityList)), 1)
@@ -798,7 +815,7 @@ class VhdlBackend(object):
         self._writeLine("end case;", 3)
         self._writeLine("end process process0;", 2)
 
-    def _writeNextstateLogic(self):
+    def _writeNextstateLogic(self, registers):
         self._writeLine("", 1)
         self._writeLine("stateReg: process(clk, reset)", 1)
         self._writeLine("begin", 1)
@@ -807,7 +824,8 @@ class VhdlBackend(object):
         self._writeLine("if rising_edge(clk) then", 2)
         self._writeLine("programCounter <= nextprogramCounter;", 3)
 
-        # TODO< all other registers >
+        for i in range(len(registers)):
+            self._writeLine("register_{0} <= nextregister_{0};".format(i), 3)
 
         self._writeLine("end if;", 2)
         self._writeLine("end process stateReg;", 1)
@@ -832,6 +850,9 @@ class VhdlBackend(object):
         binaryEncoding = bin(location)[2:].rjust(programCounterWidth, "0")
 
         self._writeLine("when \"{0}\" =>".format(binaryEncoding), 3)
+
+        if True:
+            self._writeLine("assert false report \"pc {0}\" severity note;".format(location), 4)
 
     def _writePostFrame(self):
         pass
