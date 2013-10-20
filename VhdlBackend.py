@@ -214,13 +214,13 @@ class VhdlBackend(object):
         elif instruction["op"] in ["~"]:
             self._writeInstructionNegateRegister(instruction)
         elif instruction["op"] in binary_operators and "left" in instruction:
-            self._writeInstructionBinaryOperationLeft(instruction)
+            self._writeInstructionBinaryOperationLeft(instruction, registers)
         elif instruction["op"] in binary_operators and "right" in instruction:
             self._writeInstructionBinaryOperationRight(instruction, registers)
         elif instruction["op"] in binary_operators:
             self._writeInstructionBinaryOperationGeneral(instruction)
         elif instruction["op"] == "jmp_if_false":
-            self._writeInstructionJumpIfFalse(instruction)
+            self._writeInstructionJumpIfFalse(instruction, registers, widthOfProgramCounter)
         elif instruction["op"] == "jmp_if_true":
             self._writeInstructionJumpIfTrue(instruction)
         elif instruction["op"] == "jmp_and_link":
@@ -305,7 +305,36 @@ class VhdlBackend(object):
             instruction["src"])
         )
 
-    def _writeInstructionBinaryOperationLeft(self, instruction):
+    def _writeInstructionBinaryOperationLeft(self, instruction, registers):
+        # TODO< signed unsiged >
+        # TODO< maks out based on width >
+
+        operationAsString = instruction["op"]
+
+        if operationAsString == "-":
+            pass
+        else:
+            raise Exception
+
+        destinationRegister = instruction["dest"]
+        destinationRegisterWidth = registers[ destinationRegister ].width
+        sourceRegister = instruction["srcb"]
+        sourceRegisterWidth = registers[ sourceRegister ].width
+
+        constantExpression = "to_signed({0}, {1})".format(instruction["left"]&0xffff, destinationRegisterWidth-1)
+
+        operationString = "nextregister_{0} <= {1} {2} register_{3}({4} downto 0);".format(
+            destinationRegister,
+            constantExpression,
+            operationAsString,
+            sourceRegister,
+            destinationRegisterWidth-1
+        )
+
+        self.wroteToRegister[ destinationRegister ] = True
+
+        return
+
         raise NotImplementedError
         # old orginal verilog code
         self.outputFile.write(
@@ -341,6 +370,7 @@ class VhdlBackend(object):
 
             operationString += ";"
 
+            self._writeLine(operationString, 4)
         elif instruction["op"] == ">>":
             operationString += "nextregister_{0} <= ".format(instruction["dest"])
 
@@ -354,10 +384,24 @@ class VhdlBackend(object):
             operationString += "register_{0}({1} downto {2})".format(sourceRegister, destinationWidth-1-numberOfBits, 0)
 
             operationString += ";"
+
+            self._writeLine(operationString, 4)
+        elif instruction["op"] == "<":
+            operationString = "if register_{0} < register_{1} then".format(instruction["src"], instruction["right"])
+            self._writeLine(operationString, 4)
+
+            operationString = "nextregister_{0} <= to_signed(1, {1});".format(instruction["dest"], destinationWidth)
+            self._writeLine(operationString, 5)
+
+            self._writeLine("else", 4)
+
+            operationString = "nextregister_{0} <= to_signed(0, {1});".format(instruction["dest"], destinationWidth)
+            self._writeLine(operationString, 5)
+
+            self._writeLine("end if;", 4)
+
         else:
             raise NotImplementedError
-
-        self._writeLine(operationString, 4)
 
         self.wroteToRegister[ instruction["dest"] ] = True
 
@@ -396,7 +440,36 @@ class VhdlBackend(object):
             instruction["srcb"])
         )
 
-    def _writeInstructionJumpIfFalse(self, instruction):
+    def _writeInstructionJumpIfFalse(self, instruction, registers, widthOfProgramCounter):
+        ##### TODO TODO TODO
+
+        # TODO< improve masking >
+
+        sourceRegister = instruction["src"]
+        sourceRegisterWidth = registers[ sourceRegister ].width
+
+        compareRegister = "0" * sourceRegisterWidth
+
+        if sourceRegisterWidth == 1:
+            compareRegister = "'{0}'".format(compareRegister)
+        else:
+            compareRegister = "\"{0}\"".format(compareRegister)
+
+        operationString = "if (register_{0} == {1} then".format(sourceRegister, compareRegister)
+        self._writeLine(operationString, 4)
+
+        operationString = "nextprogramCounter <= std_logic_vector( to_unsigned({0}, {1}) );".format(
+            instruction["label"]&0xffff,
+            widthOfProgramCounter
+        )
+        self._writeLine(operationString, 5)
+        self._writeLine("else", 4)
+        self._writeLine("nextprogramCounter <= std_logic_vector( unsigned(programCounter) + to_unsigned(1, 12) );", 5)
+        self._writeLine("end if;", 4)
+
+        self.wroteProgramCounter = True
+        return
+
         raise NotImplementedError
         # old orginal verilog code
         self.outputFile.write("        if (register_%s == 16'h0000)\n"%(instruction["src"]));

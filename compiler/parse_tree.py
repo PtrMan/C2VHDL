@@ -363,6 +363,9 @@ class Binary(object):
     def value(self):
         return eval("%s %s %s"%(value(self.left), self.operator, value(self.right)))
 
+    def isConstantFoldable(self):
+        return True
+
 class Unary(object):
     def __init__(self, operator, expression):
         self.expression = constant_fold(expression)
@@ -394,6 +397,9 @@ class FunctionCall(object):
                                  "src"  :self.function.return_value})
 
         return instructions
+
+    def isConstantFoldable(self):
+        return False
 
 class Output(object):
     def __init__(self, name, expression):
