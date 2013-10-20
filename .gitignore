@@ -15,3 +15,6 @@ stitcher.py
 myname
 main.v
 real_main.v
+
+.idea/*
+todo.txt
