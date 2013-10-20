@@ -144,7 +144,7 @@ class Parser:
         return wait_clocks
 
     def parse_statement(self):
-        if self.tokens.peek() in ["int", "short", "long", "char", "bool"] + self.structs:
+        if self.tokens.peek() in ["int", "short", "long", "char", "bool"] + ["ac_int"] + self.structs:
             return self.parse_compound_declaration()
         elif self.tokens.peek() == "struct":
             return self.parse_struct_declaration()
@@ -410,6 +410,64 @@ class Parser:
 
     def parse_compound_declaration(self):
         type_ = self.tokens.get()
+
+        if type_ == "ac_int":
+            if self.tokens.peek() != "<":
+                self.tokens.error(
+                    "expected template open token \"<\""
+                )
+
+            self.tokens.expect("<")
+
+            bracketLevel = 0
+            innerTokens = []
+
+            while True:
+                if self.tokens.peek() == ">" and bracketLevel == 0:
+                    self.tokens.expect(">")
+                    break
+
+                if self.tokens.peek() == ">":
+                    innerTokens.append(">")
+
+                    self.tokens.expect(">")
+                    bracketLevel -= 1
+                    continue
+
+                if self.tokens.peek() == "<":
+                    innerTokens.append("<")
+
+                    self.tokens.expect("<")
+                    bracketLevel += 1
+                    continue
+
+                innerTokens.append(self.tokens.peek())
+                self.tokens.expect(self.tokens.peek())
+
+            # TODO< better error message with a range over the template parameters
+            if len(innerTokens) != 1:
+                self.tokens.error(
+                    "expected two number arguments"
+                )
+
+            bitWidth = 0
+
+            try:
+                bitWidth = int(innerTokens[0])
+            except ValueError:
+                # TODO< better error message >
+                self.tokens.error(
+                    "positive integer between 1 and 64 expected!"
+                )
+
+            if bitWidth <= 0 or bitWidth > 64:
+                # TODO< better error message >
+                self.tokens.error(
+                    "positive integer between 1 and 64 expected!"
+                )
+
+            # TODO< save bitwidth with type into type information >
+
         instances = []
         while True:
             name = self.tokens.get()
@@ -425,11 +483,12 @@ class Parser:
         return CompoundDeclaration(instances)
 
     def parseVariableDeclaration(self, type_, name):
-        #struct declaration
+        # check for struct declaration
         if type_ in self.structs:
             declaration = self.scope[type_]
+
         elif type_ in ["int", "short", "long", "char", "bool"]:
-            #array declaration 
+            # check for array declaration
             if self.tokens.peek() == "[":
                 self.tokens.expect("[")
                 size = self.tokens.get()
@@ -437,22 +496,64 @@ class Parser:
                 type_+="[]"
                 declaration = ArrayDeclaration(self.allocator, size, type_)
 
-            #simple variable declaration 
-            else:
-                if self.tokens.peek() == "=":
-                    self.tokens.expect("=")
-                    initializer = self.parse_ternary_expression()
-                else:
-                    initializer = Constant(0)
-                declaration = VariableDeclaration(
-                    self.allocator, 
-                    initializer, 
-                    name,
-                    type_
+                return declaration
+        """"
+        # this parses the template types
+        # it is for now limited to the systemC like built in types
+        elif type_ in ["ac_int"]:
+            if self.tokens.peek() != "<":
+                self.tokens.error(
+                    "expected template open token \"<\""
                 )
 
-        # TODO< system C compatible types >
-        # TODO< ac_int >
+            self.tokens.expect("<")
+
+            bracketLevel = 0
+            innerTokens = []
+
+            while True:
+                if self.tokens.peek() == ">" and bracketLevel == 0:
+                    self.tokens.expect(">")
+                    break
+
+                if self.tokens.peek() == ">":
+                    innerTokens.append(">")
+
+                    self.tokens.expect(">")
+                    bracketLevel -= 1
+                    continue
+
+                if self.tokens.peek() == "<":
+                    innerTokens.append("<")
+
+                    self.tokens.expect("<")
+                    bracketLevel += 1
+                    continue
+
+                innerTokens.append(self.tokens.peek())
+                self.tokens.expect(self.tokens.peek)
+
+            # TODO< better error message with a range over the template parameters
+            if len(innerTokens) != 2:
+                self.tokens.error(
+                    "expected two number arguments"
+                )
+        """
+
+
+        # simple variable declaration
+        if self.tokens.peek() == "=":
+            self.tokens.expect("=")
+            initializer = self.parse_ternary_expression()
+        else:
+            initializer = Constant(0)
+
+        declaration = VariableDeclaration(
+            self.allocator,
+            initializer,
+            name,
+            type_
+        )
 
         return declaration
 
