@@ -30,8 +30,53 @@ def truncate(number):
         number =  ~0xffff | number
     return number
 
+class ParserTreeElement(object):
+    class EnumElementType:
+        PROCESS = 0
+        FUNCTION = 1
+        BREAK = 2
+        CONTINUE = 3
+        ASSERT = 4
+        RETURN = 5
+        REPORT = 6
+        WAITCLOCKS = 7
+        IF = 8
+        SWITCH = 9
+        CASE = 10
+        DEFAULT = 11
+        LOOP = 12
+        FOR = 13
+        BLOCK = 14
+        COMPOUNDDECLARATION = 15
+        VARIABLEDECLARATION = 16
+        VARIABLEINSTANCE = 17
+        #ARRAYDECLARATION = 18
+        ARRAYINSTANCE = 19
+        #STRUCTDECLARATION = 20
+        STRUCTINSTANCE = 21
+        ARGUMENT = 22
+        DISCARDEXPRESSION = 23
+        ANDOR = 24
+        BINARY = 25
+        UNARY = 26
+        FUNCTIONCALL = 27
+        OUTPUT = 28
+        INPUT = 29
+        READY = 30
+        ARRAY = 31
+        ARRAYINDEX = 32
+        VARIABLE = 33
+        BOOLEAN = 34
+        ASSIGNMENT = 35
+        CONSTANT = 36
 
-class Process(object):
+    def __init__(self, elementType):
+        self.elementType = elementType
+
+class Process(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.PROCESS)
+
     def generate(self):
         instructions = []
         for function in self.functions:
@@ -51,8 +96,10 @@ class Process(object):
 
         return instructions
 
-class Function(object):
+class Function(ParserTreeElement):
     def __init__(self, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.FUNCTION)
+
         self.allocator = allocator
         self.name = ""
         self.type_ = ""
@@ -70,13 +117,24 @@ class Function(object):
 
         return instructions
 
-class Break(object):
-    def generate(self): return [{"op":"goto", "label":"break_%s"%id(self.loop)}]
+class Break(ParserTreeElement):
+    def __init__(self, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.BREAK)
 
-class Continue(object):
-    def generate(self): return [{"op":"goto", "label":"continue_%s"%id(self.loop)}]
+    def generate(self):
+        return [{"op":"goto", "label":"break_%s"%id(self.loop)}]
 
-class Assert(object):
+class Continue(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.CONTINUE)
+
+    def generate(self):
+        return [{"op":"goto", "label":"continue_%s"%id(self.loop)}]
+
+class Assert(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.ASSERT)
+
     def generate(self):
         result = self.allocator.new()
         instructions = self.expression.generate(result)
@@ -85,7 +143,10 @@ class Assert(object):
 
         return instructions
 
-class Return(object):
+class Return(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.RETURN)
+
     def generate(self):
         if hasattr(self, "expression"):
             instructions = self.expression.generate(self.function.return_value)
@@ -95,7 +156,10 @@ class Return(object):
         instructions.append({"op":"jmp_to_reg", "src":self.function.return_address})
         return instructions
 
-class Report(object):
+class Report(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.REPORT)
+
     def generate(self):
         result = self.allocator.new()
         instructions = self.expression.generate(result)
@@ -104,7 +168,10 @@ class Report(object):
 
         return instructions
 
-class WaitClocks(object):
+class WaitClocks(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.WAITCLOCKS)
+
     def generate(self):
         result = self.allocator.new()
         instructions = self.expression.generate(result)
@@ -112,7 +179,10 @@ class WaitClocks(object):
         instructions.append({"op":"wait_clocks", "src":result})
         return instructions
 
-class If(object):
+class If(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.IF)
+
     def generate(self):
         try:
             if   value(self.expression):
@@ -141,7 +211,10 @@ class If(object):
             instructions.append({"op":"label", "label":"end_%s"%id(self)})
             return instructions
 
-class Switch(object):
+class Switch(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.SWITCH)
+
     def generate(self):
         result = self.allocator.new()
         test = self.allocator.new()
@@ -162,15 +235,24 @@ class Switch(object):
 
         return instructions
 
-class Case(object):
+class Case(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.CASE)
+
     def generate(self):
         return [{"op":"label", "label":"case_%s"%id(self)}]
 
-class Default(object):
+class Default(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.DEFAULT)
+
     def generate(self):
         return [{"op":"label", "label":"case_%s"%id(self)}]
 
-class Loop(object):
+class Loop(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.LOOP)
+
     def generate(self):
         instructions = [{"op":"label", "label":"begin_%s"%id(self)}]
         instructions.append({"op":"label", "label":"continue_%s"%id(self)})
@@ -180,7 +262,10 @@ class Loop(object):
 
         return instructions
 
-class For(object):
+class For(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.FOR)
+
     def generate(self):
         instructions = []
         if hasattr(self, "statement1"):
@@ -200,15 +285,20 @@ class For(object):
         instructions.append({"op":"label", "label":"break_%s"%id(self)})
         return instructions
 
-class Block(object):
+class Block(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.BLOCK)
+
     def generate(self):
         instructions = []
         for statement in self.statements:
             instructions.extend(statement.generate())
         return instructions
 
-class CompoundDeclaration(object):
+class CompoundDeclaration(ParserTreeElement):
     def __init__(self, declarations):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.COMPOUNDDECLARATION)
+
         self.declarations = declarations
 
     def generate(self):
@@ -217,8 +307,10 @@ class CompoundDeclaration(object):
             instructions.extend(declaration.generate());
         return instructions
 
-class VariableDeclaration(object):
+class VariableDeclaration(ParserTreeElement):
     def __init__(self, allocator, initializer, name, type_):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.VARIABLEDECLARATION)
+
         self.initializer = initializer
         self.allocator = allocator
         self.type_ = type_
@@ -227,8 +319,10 @@ class VariableDeclaration(object):
         register = self.allocator.new("variable "+self.name)
         return VariableInstance(register, self.initializer, self.type_)
 
-class VariableInstance(object):
+class VariableInstance(ParserTreeElement):
     def __init__(self, register, initializer, type_):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.VARIABLEINSTANCE)
+
         self.register = register
         self.type_ = type_
         self.initializer = initializer
@@ -241,13 +335,16 @@ class ArrayDeclaration(object):
         self.allocator = allocator
         self.size = size
         self.type_ = type_
+
     def instance(self):
         location = self.allocator.new_array(self.size)
         register = self.allocator.new("array")
         return ArrayInstance(location, register, self.size, self.type_)
 
-class ArrayInstance(object):
+class ArrayInstance(ParserTreeElement):
     def __init__(self, location, register, size, type_):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.ARRAYINSTANCE)
+
         self.register = register
         self.location = location
         self.size = size
@@ -266,8 +363,10 @@ class StructDeclaration(object):
             instances[name] = declaration.instance()
         return StructInstance(instances)
 
-class StructInstance(object):
+class StructInstance(ParserTreeElement):
     def __init__(self, members):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.STRUCTINSTANCE)
+
         self.members = members
         self.type_ = "struct"
 
@@ -277,15 +376,21 @@ class StructInstance(object):
             instructions.extend(member.generate())
         return instructions
 
-class Argument(object):
+class Argument(ParserTreeElement):
     def __init__(self, name, type_, parser):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.ARGUMENT)
+
         self.type_=type_
         parser.scope[name] = self
         self.register = parser.allocator.new("function argument "+name)
-    def generate(self): return []
 
-class DiscardExpression(object):
+    def generate(self):
+        return []
+
+class DiscardExpression(ParserTreeElement):
     def __init__(self, expression, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.DISCARDEXPRESSION)
+
         self.expression = expression
         self.allocator = allocator
 
@@ -309,8 +414,10 @@ def AND(left, right):
 def OR(left, right):
     return ANDOR(left, right, "jmp_if_true")
 
-class ANDOR(object):
+class ANDOR(ParserTreeElement):
     def __init__(self, left, right, op):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.ANDOR)
+
         self.left = constant_fold(left)
         self.right = constant_fold(right)
         self.op = op
@@ -329,8 +436,10 @@ class ANDOR(object):
         else:
             return value(self.left) or value(self.right)
 
-class Binary(object):
+class Binary(ParserTreeElement):
     def __init__(self, operator, left, right, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.BINARY)
+
         self.left = constant_fold(left)
         self.right = constant_fold(right)
         self.operator = operator
@@ -366,8 +475,10 @@ class Binary(object):
     def isConstantFoldable(self):
         return True
 
-class Unary(object):
+class Unary(ParserTreeElement):
     def __init__(self, operator, expression):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.UNARY)
+
         self.expression = constant_fold(expression)
         self.operator = operator
         self.type_ = self.expression.type_
@@ -380,7 +491,10 @@ class Unary(object):
     def value(self):
         return eval("%s%s"%(self.operator, value(self.expression)))
 
-class FunctionCall(object):
+class FunctionCall(ParserTreeElement):
+    def __init__(self):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.FUNCTIONCALL)
+
     def generate(self, result):
         instructions = []
 
@@ -401,8 +515,10 @@ class FunctionCall(object):
     def isConstantFoldable(self):
         return False
 
-class Output(object):
+class Output(ParserTreeElement):
     def __init__(self, name, expression):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.OUTPUT)
+
         self.name = name
         self.expression = expression
         self.type_ = "int"
@@ -413,24 +529,30 @@ class Output(object):
 
         return instructions
 
-class Input(object):
+class Input(ParserTreeElement):
     def __init__(self, name):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.INPUT)
+
         self.name = name
         self.type_ = "int"
 
     def generate(self, result):
         return [{"op"   :"read", "dest" :result, "input":self.name}]
 
-class Ready(object):
+class Ready(ParserTreeElement):
     def __init__(self, name):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.READY)
+
         self.name = name
         self.type_ = "int"
 
     def generate(self, result):
         return [{"op"   :"ready", "dest" :result, "input":self.name}]
 
-class Array(object):
+class Array(ParserTreeElement):
     def __init__(self, declaration, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.ARRAY)
+
         self.declaration = declaration
         self.allocator = allocator
         self.storage = "register"
@@ -448,8 +570,10 @@ class Array(object):
     def isConstantFoldable(self):
         return False
 
-class ArrayIndex(object):
+class ArrayIndex(ParserTreeElement):
     def __init__(self, declaration, index_expression, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.ARRAYINDEX)
+
         self.declaration = declaration
         self.allocator = allocator
         self.index_expression = index_expression
@@ -475,8 +599,10 @@ class ArrayIndex(object):
     def isConstantFoldable(self):
         return False
 
-class Variable(object):
+class Variable(ParserTreeElement):
     def __init__(self, declaration, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.VARIABLE)
+
         self.declaration = declaration
         self.allocator = allocator
         self.storage = "register"
@@ -494,8 +620,10 @@ class Variable(object):
     def isConstantFoldable(self):
         return False
 
-class Boolean(object):
+class Boolean(ParserTreeElement):
     def __init__(self, value):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.BOOLEAN)
+
         self.value = value
         self.type_ = "boolean"
 
@@ -506,8 +634,10 @@ class Boolean(object):
     def isConstantFoldable(self):
         return False
 
-class Assignment(object):
+class Assignment(ParserTreeElement):
     def __init__(self, lvalue, expression, allocator):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.INPUT)
+
         self.lvalue = lvalue
         self.expression = expression
         self.allocator = allocator
@@ -535,8 +665,10 @@ class Assignment(object):
 
         return instructions
 
-class Constant(object):
+class Constant(ParserTreeElement):
     def __init__(self, value):
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.CONSTANT)
+
         self._value = value
         self.type_ = "int"
 
