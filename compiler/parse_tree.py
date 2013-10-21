@@ -472,6 +472,9 @@ class ArrayIndex(object):
                              "dest"  :result})
         return instructions
 
+    def isConstantFoldable(self):
+        return False
+
 class Variable(object):
     def __init__(self, declaration, allocator):
         self.declaration = declaration
