@@ -23,6 +23,9 @@ from DecoratedDagElementFactory import *
 
 from RegisterDefinition import RegisterDefinition
 
+from Unroller import Unroller
+from Simplifier import Simplifier
+
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
@@ -42,9 +45,26 @@ if __name__ == "__main__":
     reuse = "no_reuse" not in sys.argv
 
     try:
-        #compile into CHIP
-        parser = Parser(input_file, reuse)
+        # realloc is false because we want to do loop unrolling so a optimisation doesn't make any sense
+        parser = Parser(input_file, False)
         process = parser.parse_process()
+
+        # just for testing
+        if True:
+            unrollTypeForForStatement = Unroller.getUnrollTypeOfForStatement(process.main.statement.statements[1])
+
+            if unrollTypeForForStatement == Unroller.EnumForStatementUnrollType.A:
+                unrollFactor = 4
+
+                tempForStatement = process.main.statement.statements[1]
+
+                Unroller.unrollForStatementTypeA(unrollFactor, tempForStatement)
+
+                Simplifier.tryToRemoveForBodyForTypeA(tempForStatement)
+
+
+            # now we must check if the range of the for expression is statically bound and if the loop got completly unrolled
+            # if this is the case we can drop the for body completly
 
         if False:
             main = process.main

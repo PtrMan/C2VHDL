@@ -1,15 +1,6 @@
 
-/*
-void include_function(int a, int b, int c) {
-	for(;;) {
-	   int result = (a << 5) + (b >> 2);
-   }
-
-   return;
-}*/
-
 int abs(int value) {
-   if( value < 0 ) {
+   if (value < 0) {
       return -value;
    }
    return value;
@@ -17,15 +8,15 @@ int abs(int value) {
 
 void include_function()
 {
-   int a = -5;
+   // TODO< type checking and co >
+   //ac_int<5> b;
 
-   a = abs(a);
+   int i;
 
-   report(a);
 
-   a = -6;
+   //int b [8];
 
-   a = abs(a);
-
-   report(a);
+   for(i = 0;i < 4; i+=1) {
+      report(i);
+   }
 }

@@ -289,6 +289,8 @@ class Block(ParserTreeElement):
     def __init__(self):
         ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.BLOCK)
 
+        self.statements = []
+
     def generate(self):
         instructions = []
         for statement in self.statements:
@@ -636,7 +638,7 @@ class Boolean(ParserTreeElement):
 
 class Assignment(ParserTreeElement):
     def __init__(self, lvalue, expression, allocator):
-        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.INPUT)
+        ParserTreeElement.__init__(self, ParserTreeElement.EnumElementType.ASSIGNMENT)
 
         self.lvalue = lvalue
         self.expression = expression
